@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英単語学習アプリ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .slide-out-left  { animation: slideOutLeft  0.18s ease-in forwards; }
+    .slide-out-right { animation: slideOutRight 0.18s ease-in forwards; }
+    .slide-in-left   { animation: slideInLeft   0.18s ease-out forwards; }
+    .slide-in-right  { animation: slideInRight  0.18s ease-out forwards; }
+    @keyframes slideOutLeft  { to { transform: translateX(-100%); opacity: 0; } }
+    @keyframes slideOutRight { to { transform: translateX( 100%); opacity: 0; } }
+    @keyframes slideInLeft   { from { transform: translateX( 100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slideInRight  { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex flex-col transition-colors duration-300">
+
+  <!-- ヘッダー -->
+  <header class="flex justify-between items-center px-4 py-3 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-sm">
+    <h1 class="text-lg font-bold dark:text-white">英単語学習</h1>
+    <button id="toggleTheme" class="text-xl px-2">🌙</button>
+  </header>
+
+  <!-- フィルターバー（スコアバンド） -->
+  <div class="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 overflow-x-auto">
+    <div id="bandFilters" class="flex gap-2 px-4 py-2 min-w-max">
+      <button class="band-chip selected" data-band="">全て</button>
+    </div>
+  </div>
+
+  <!-- フィルターバー（学習状況） -->
+  <div class="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
+    <div class="flex gap-2 px-4 py-2">
+      <button class="status-chip selected" data-status="">全て</button>
+      <button class="status-chip" data-status="unstudied">未学習</button>
+      <button class="status-chip" data-status="notyet" style="--chip-color: #f97316;">まだ</button>
+      <button class="status-chip" data-status="mastered" style="--chip-color: #22c55e;">覚えた</button>
+    </div>
+  </div>
+
+  <!-- 進捗 -->
+  <div class="flex justify-between items-center px-4 pt-3 text-sm text-gray-500 dark:text-gray-400">
+    <span id="progress">0 / 0</span>
+    <div class="flex gap-4">
+      <span><span id="masteredCount" class="font-semibold text-green-500">0</span> 覚えた</span>
+      <span><span id="notYetCount"   class="font-semibold text-orange-500">0</span> まだ</span>
+    </div>
+  </div>
+
+  <!-- カードエリア -->
+  <main class="flex-grow flex items-center justify-center px-4 py-4 overflow-hidden">
+    <div id="cardWrapper" class="w-full max-w-md">
+      <div id="card" class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+
+        <!-- バッジ行 -->
+        <div class="flex justify-between items-center px-5 pt-5">
+          <span id="bandBadge" class="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"></span>
+          <span id="importanceBadge" class="text-xs px-3 py-1 rounded-full"></span>
+        </div>
+
+        <!-- 英単語 -->
+        <div class="flex items-center justify-center px-6 py-10">
+          <p id="word" class="text-4xl font-bold text-center dark:text-white">Loading...</p>
+        </div>
+
+        <hr class="dark:border-gray-700 mx-5">
+
+        <!-- 意味エリア（非表示→表示） -->
+        <div id="meaningArea" class="hidden px-5 pt-4 pb-2 text-center">
+          <p id="meaning" class="text-xl font-semibold dark:text-white"></p>
+          <p id="example" class="mt-2 text-sm text-gray-500 dark:text-gray-400 italic"></p>
+        </div>
+
+        <!-- ボタンエリア -->
+        <div id="revealArea" class="px-5 py-5">
+          <button id="showBtn" class="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold transition">
+            意味を表示
+          </button>
+        </div>
+
+        <div id="markArea" class="hidden px-5 pb-5 flex gap-3">
+          <button id="notYetBtn" class="flex-1 py-3 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-600 font-semibold transition flex items-center justify-center gap-2">
+            ↺ まだ
+          </button>
+          <button id="masteredBtn" class="flex-1 py-3 rounded-xl bg-green-100 hover:bg-green-200 text-green-600 font-semibold transition flex items-center justify-center gap-2">
+            ✓ 覚えた
+          </button>
+        </div>
+
+      </div>
+
+      <!-- 単語なし -->
+      <div id="emptyState" class="hidden text-center py-16 text-gray-400 dark:text-gray-500">
+        <div class="text-5xl mb-3">✅</div>
+        <p>このフィルターの単語はありません</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ナビゲーション -->
+  <footer class="px-4 pb-8 pt-2">
+    <div class="flex gap-3 max-w-md mx-auto">
+      <button id="prevBtn" class="nav-btn">
+        <span class="text-xl">←</span>
+        <span class="text-xs">前へ</span>
+      </button>
+      <button id="shuffleBtn" class="nav-btn">
+        <span class="text-xl">⇄</span>
+        <span class="text-xs">ランダム</span>
+      </button>
+      <button id="nextBtn" class="nav-btn">
+        <span class="text-xl">→</span>
+        <span class="text-xs">次へ</span>
+      </button>
+    </div>
+  </footer>
+
+  <style>
+    .band-chip, .status-chip {
+      padding: 4px 14px;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      background: #e5e7eb;
+      color: #374151;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    .dark .band-chip, .dark .status-chip {
+      background: #374151;
+      color: #d1d5db;
+    }
+    .band-chip.selected {
+      background: #3b82f6;
+      color: white;
+    }
+    .status-chip.selected {
+      background: var(--chip-color, #3b82f6);
+      color: white;
+    }
+    .nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 0;
+      border-radius: 14px;
+      background: #e5e7eb;
+      color: #374151;
+      transition: background 0.15s;
+    }
+    .dark .nav-btn {
+      background: #374151;
+      color: #d1d5db;
+    }
+    .nav-btn:hover { background: #d1d5db; }
+    .dark .nav-btn:hover { background: #4b5563; }
+  </style>
+
+  <script>
+    // ---- 状態 ----
+    let allWords = [];
+    let currentIndex = 0;
+    let selectedBand = '';
+    let selectedStatus = '';
+    let masteredIds = new Set(JSON.parse(localStorage.getItem('masteredIds') || '[]'));
+    let notYetIds   = new Set(JSON.parse(localStorage.getItem('notYetIds')   || '[]'));
+
+    // ---- フィルター適用 ----
+    function filteredWords() {
+      return allWords.filter(w => {
+        if (selectedBand && String(w.score_band) !== selectedBand) return false;
+        const status = wordStatus(w.No);
+        if (selectedStatus === 'unstudied' && status !== 'unstudied') return false;
+        if (selectedStatus === 'notyet'    && status !== 'notyet')    return false;
+        if (selectedStatus === 'mastered'  && status !== 'mastered')  return false;
+        return true;
+      });
+    }
+
+    function wordStatus(id) {
+      if (masteredIds.has(id)) return 'mastered';
+      if (notYetIds.has(id))   return 'notyet';
+      return 'unstudied';
+    }
+
+    // ---- 保存 ----
+    function saveStatus() {
+      localStorage.setItem('masteredIds', JSON.stringify([...masteredIds]));
+      localStorage.setItem('notYetIds',   JSON.stringify([...notYetIds]));
+    }
+
+    // ---- 表示 ----
+    function renderCard(animate) {
+      const words = filteredWords();
+      const card = document.getElementById('card');
+      const empty = document.getElementById('emptyState');
+
+      updateStats();
+
+      if (words.length === 0) {
+        card.classList.add('hidden');
+        empty.classList.remove('hidden');
+        document.getElementById('progress').textContent = '0 / 0';
+        return;
+      }
+
+      card.classList.remove('hidden');
+      empty.classList.add('hidden');
+
+      if (currentIndex >= words.length) currentIndex = words.length - 1;
+      const w = words[currentIndex];
+
+      document.getElementById('progress').textContent = `${currentIndex + 1} / ${words.length}`;
+      document.getElementById('word').textContent = w.word;
+      document.getElementById('meaning').textContent = w.meaning;
+      document.getElementById('example').textContent = w.example;
+
+      // バッジ
+      const bandBadge = document.getElementById('bandBadge');
+      bandBadge.textContent = `TOEIC ${w.score_band}`;
+      const bandColors = { 500:'bg-green-100 text-green-600', 600:'bg-blue-100 text-blue-600', 700:'bg-orange-100 text-orange-600', 800:'bg-purple-100 text-purple-600' };
+      bandBadge.className = `text-xs px-3 py-1 rounded-full ${bandColors[w.score_band] || 'bg-red-100 text-red-600'}`;
+
+      const impBadge = document.getElementById('importanceBadge');
+      impBadge.textContent = w.importance;
+      impBadge.className = `text-xs px-3 py-1 rounded-full ${w.importance === '必須' ? 'bg-red-100 text-red-500' : w.importance === '重要' ? 'bg-orange-100 text-orange-500' : 'bg-gray-100 text-gray-500'}`;
+
+      // 意味を隠す
+      hideReveal();
+
+      if (animate) {
+        const wrapper = document.getElementById('cardWrapper');
+        wrapper.classList.add(animate === 'forward' ? 'slide-in-left' : 'slide-in-right');
+        wrapper.addEventListener('animationend', () => {
+          wrapper.classList.remove('slide-in-left', 'slide-in-right');
+        }, { once: true });
+      }
+    }
+
+    function hideReveal() {
+      document.getElementById('meaningArea').classList.add('hidden');
+      document.getElementById('revealArea').classList.remove('hidden');
+      document.getElementById('markArea').classList.add('hidden');
+      document.getElementById('markArea').classList.remove('flex');
+    }
+
+    function updateStats() {
+      document.getElementById('masteredCount').textContent = masteredIds.size;
+      document.getElementById('notYetCount').textContent   = notYetIds.size;
+    }
+
+    function slideAndGo(direction, callback) {
+      const wrapper = document.getElementById('cardWrapper');
+      wrapper.classList.add(direction === 'forward' ? 'slide-out-left' : 'slide-out-right');
+      wrapper.addEventListener('animationend', () => {
+        wrapper.classList.remove('slide-out-left', 'slide-out-right');
+        callback();
+        renderCard(direction);
+      }, { once: true });
+    }
+
+    // ---- ボタン操作 ----
+    document.getElementById('showBtn').addEventListener('click', () => {
+      document.getElementById('meaningArea').classList.remove('hidden');
+      document.getElementById('revealArea').classList.add('hidden');
+      document.getElementById('markArea').classList.remove('hidden');
+      document.getElementById('markArea').classList.add('flex');
+    });
+
+    document.getElementById('masteredBtn').addEventListener('click', () => {
+      const words = filteredWords();
+      if (!words.length) return;
+      const id = words[currentIndex].No;
+      slideAndGo('forward', () => {
+        masteredIds.add(id);
+        notYetIds.delete(id);
+        saveStatus();
+        const newWords = filteredWords();
+        if (currentIndex >= newWords.length) currentIndex = Math.max(0, newWords.length - 1);
+        else currentIndex = Math.min(currentIndex + 1, newWords.length - 1);
+      });
+    });
+
+    document.getElementById('notYetBtn').addEventListener('click', () => {
+      const words = filteredWords();
+      if (!words.length) return;
+      const id = words[currentIndex].No;
+      slideAndGo('forward', () => {
+        notYetIds.add(id);
+        masteredIds.delete(id);
+        saveStatus();
+        const newWords = filteredWords();
+        if (currentIndex >= newWords.length) currentIndex = Math.max(0, newWords.length - 1);
+        else currentIndex = Math.min(currentIndex + 1, newWords.length - 1);
+      });
+    });
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+      slideAndGo('forward', () => {
+        const words = filteredWords();
+        if (words.length) currentIndex = (currentIndex + 1) % words.length;
+      });
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', () => {
+      slideAndGo('backward', () => {
+        const words = filteredWords();
+        if (words.length) currentIndex = (currentIndex - 1 + words.length) % words.length;
+      });
+    });
+
+    document.getElementById('shuffleBtn').addEventListener('click', () => {
+      slideAndGo('forward', () => {
+        const words = filteredWords();
+        if (words.length > 1) {
+          let next;
+          do { next = Math.floor(Math.random() * words.length); } while (next === currentIndex);
+          currentIndex = next;
+        }
+      });
+    });
+
+    // ---- スコアバンドフィルター ----
+    function buildBandFilters() {
+      const bands = [...new Set(allWords.map(w => w.score_band))].sort((a,b) => a-b);
+      const container = document.getElementById('bandFilters');
+      bands.forEach(band => {
+        const btn = document.createElement('button');
+        btn.className = 'band-chip';
+        btn.dataset.band = band;
+        btn.textContent = `${band}点`;
+        container.appendChild(btn);
+      });
+      container.addEventListener('click', e => {
+        const chip = e.target.closest('.band-chip');
+        if (!chip) return;
+        selectedBand = chip.dataset.band;
+        container.querySelectorAll('.band-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        currentIndex = 0;
+        renderCard(null);
+      });
+    }
+
+    // ---- 学習状況フィルター ----
+    document.querySelectorAll('.status-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        selectedStatus = chip.dataset.status;
+        document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        currentIndex = 0;
+        renderCard(null);
+      });
+    });
+
+    // ---- ダークモード ----
+    let isDark = localStorage.getItem('theme') === 'dark' ||
+      (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    function applyTheme() {
+      document.documentElement.classList.toggle('dark', isDark);
+      document.getElementById('toggleTheme').textContent = isDark ? '☀️' : '🌙';
+    }
+    applyTheme();
+    document.getElementById('toggleTheme').addEventListener('click', () => {
+      isDark = !isDark;
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      applyTheme();
+    });
+
+    // ---- スワイプ ----
+    let touchStartX = 0;
+    document.getElementById('cardWrapper').addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+    });
+    document.getElementById('cardWrapper').addEventListener('touchend', e => {
+      const diff = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(diff) < 60) return;
+      if (diff < 0) {
+        slideAndGo('forward', () => {
+          const words = filteredWords();
+          if (words.length) currentIndex = (currentIndex + 1) % words.length;
+        });
+      } else {
+        slideAndGo('backward', () => {
+          const words = filteredWords();
+          if (words.length) currentIndex = (currentIndex - 1 + words.length) % words.length;
+        });
+      }
+    });
+
+    // ---- データ読み込み ----
+    fetch('words.json')
+      .then(r => r.json())
+      .then(data => {
+        allWords = data;
+        buildBandFilters();
+        renderCard(null);
+      })
+      .catch(() => {
+        document.getElementById('word').textContent = 'words.json を読み込めませんでした';
+      });
+  </script>
+</body>
+</html>
