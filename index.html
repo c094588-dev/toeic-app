@@ -220,8 +220,8 @@
 
       // バッジ
       const bandBadge = document.getElementById('bandBadge');
-      bandBadge.textContent = `TOEIC ${w.score_band}`;
-      const bandColors = { 500:'bg-green-100 text-green-600', 600:'bg-blue-100 text-blue-600', 700:'bg-orange-100 text-orange-600', 800:'bg-purple-100 text-purple-600' };
+      bandBadge.textContent = levelLabel(w.score_band);
+      const bandColors = { 100:'bg-pink-100 text-pink-600', 200:'bg-teal-100 text-teal-600', 300:'bg-emerald-100 text-emerald-600', 500:'bg-green-100 text-green-600', 600:'bg-blue-100 text-blue-600', 700:'bg-orange-100 text-orange-600', 800:'bg-purple-100 text-purple-600' };
       bandBadge.className = `text-xs px-3 py-1 rounded-full ${bandColors[w.score_band] || 'bg-red-100 text-red-600'}`;
 
       const impBadge = document.getElementById('importanceBadge');
@@ -324,6 +324,12 @@
     });
 
     // ---- スコアバンドフィルター ----
+    // score_band 100〜300 はキッズ、500以上はTOEIC
+    function levelLabel(band) {
+      band = Number(band);
+      return band < 500 ? `キッズ Lv.${band / 100}` : `TOEIC ${band}`;
+    }
+
     function buildBandFilters() {
       const bands = [...new Set(allWords.map(w => w.score_band))].sort((a,b) => a-b);
       const container = document.getElementById('bandFilters');
@@ -331,7 +337,7 @@
         const btn = document.createElement('button');
         btn.className = 'band-chip';
         btn.dataset.band = band;
-        btn.textContent = `${band}点`;
+        btn.textContent = band < 500 ? `キッズ${band / 100}` : `${band}点`;
         container.appendChild(btn);
       });
       container.addEventListener('click', e => {

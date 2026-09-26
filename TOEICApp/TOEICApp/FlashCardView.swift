@@ -14,7 +14,7 @@ struct FlashCardView: View {
         VStack(spacing: 0) {
             // バッジ
             HStack {
-                Label("TOEIC \(word.scoreBand)", systemImage: "chart.bar.fill")
+                Label(Level.badge(word.scoreBand), systemImage: "chart.bar.fill")
                     .font(.caption)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -142,6 +142,9 @@ struct FlashCardView: View {
 
     private func bandColor(_ band: Int) -> Color {
         switch band {
+        case 100: return .pink
+        case 200: return .teal
+        case 300: return .mint
         case 500: return .green
         case 600: return .blue
         case 700: return .orange
