@@ -91,7 +91,7 @@
     { "No": 1290, "word": "hamper", "meaning": "妨げる、邪魔する", "example": "The rescue efforts were hampered by the storm.", "score_band": 800, "importance": "必須" },
     { "No": 1291, "word": "haphazard", "meaning": "でたらめな、計画性のない", "example": "The books were stacked in a haphazard manner.", "score_band": 800, "importance": "高" },
     { "No": 1292, "word": "harness", "meaning": "（自然の力を）利用する、馬具", "example": "The company aims to harness solar energy.", "score_band": 800, "importance": "必須" },
-    { "No": 1293, "word": "hasten", "meaning": "急がせる、早める", "example": "We should take steps to hasten the recovery process.", "score_band": 1293, "importance": "必須" },
+    { "No": 1293, "word": "hasten", "meaning": "急がせる、早める", "example": "We should take steps to hasten the recovery process.", "score_band": 800, "importance": "必須" },
     { "No": 1294, "word": "haughty", "meaning": "傲慢な、高慢な", "example": "His haughty attitude made him unpopular.", "score_band": 800, "importance": "高" },
     { "No": 1295, "word": "havoc", "meaning": "大混乱、大損害", "example": "The storm wreaked havoc on the coast.", "score_band": 800, "importance": "高" },
     { "No": 1296, "word": "hectic", "meaning": "多忙を極める、てんてこ舞いの", "example": "The office was hectic before the long holiday.", "score_band": 800, "importance": "必須" },
