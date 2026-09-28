@@ -238,7 +238,10 @@ function LearningApp() {
         {showMeaning && (
           <View style={[s.meaning, { borderTopColor: c.line }]}>
             <Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>
-            {text(w.example, 16, c.muted)}
+            <View style={{ gap: 6 }}>
+              {text(w.example, 16, c.muted)}
+              {text(w.example_ja, 14, c.muted)}
+            </View>
           </View>
         )}
       </View>
@@ -388,11 +391,14 @@ function LearningApp() {
                   {!revealed ? (
                     button("意味を表示", () => setRevealed(true))
                   ) : (
-                    <>
-                      {text("思い出せましたか？", 14, c.muted)}
-                      {button("覚えた ✓", () => markCard(true))}
-                      {button("まだ・あとで復習", () => markCard(false), true)}
-                    </>
+                    <View style={{ flexDirection: "row", gap: 12 }}>
+                      <View style={{ flex: 1 }}>
+                        {button("まだ", () => markCard(false), true)}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        {button("覚えた ✓", () => markCard(true))}
+                      </View>
+                    </View>
                   )}
                 </>
               ) : (

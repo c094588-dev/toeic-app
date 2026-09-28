@@ -3,6 +3,7 @@ export type Word = {
   word: string;
   meaning: string;
   example: string;
+  example_ja: string;
   score_band: number;
   importance: string;
 };

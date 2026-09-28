@@ -63,3 +63,10 @@ test("壊れた保存形式を黙って上書きしない・不明IDを除外す
 });
 test("教材が空でもクイズ生成は停止しない", () =>
   assert.deepEqual(makeQuiz([], 500, { mastered: [], notYet: [] }), []));
+
+test("全例文に日本語訳があり、英語の例文も保持されている", () => {
+  for (const w of words) {
+    assert.ok(typeof w.example === "string" && w.example.trim(), `英語例文: ${w.No}`);
+    assert.ok(typeof w.example_ja === "string" && /[ぁ-んァ-ヶ一-龯]/u.test(w.example_ja), `日本語訳: ${w.No}`);
+  }
+});
