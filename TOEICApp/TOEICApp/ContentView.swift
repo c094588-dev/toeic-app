@@ -32,43 +32,40 @@ struct LevelSelectView: View {
     @ObservedObject var store: WordStore
     let onSelect: (Int) -> Void
 
-    private var kidsLevels: [Int] { store.availableScoreBands.filter { Level.isKids($0) } }
-    private var toeicLevels: [Int] { store.availableScoreBands.filter { !Level.isKids($0) } }
+    private var toiecLevels: [Int] { store.availableScoreBands.filter { $0 >= 500 } }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    levelSection(header: "TOEIC", levels: toeicLevels)
-                    levelSection(header: "キッズ", levels: kidsLevels)
+                VStack(spacing: 10) {
+                    ForEach(toiecLevels, id: \.self) { level in
+                        LevelRowView(
+                            title: "TOEIC \(level)点",
+                            subtitle: levelDescription(level),
+                            mastered: store.masteredCount(for: level),
+                            total: store.totalCount(for: level),
+                            action: { onSelect(level) }
+                        )
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("英単語")
+            .navigationTitle("TOEIC英単語")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 
-    @ViewBuilder
-    private func levelSection(header: String, levels: [Int]) -> some View {
-        if !levels.isEmpty {
-            Text(header)
-                .font(.footnote.bold())
-                .foregroundColor(.secondary)
-                .padding(.top, 8)
-                .padding(.leading, 4)
-            ForEach(levels, id: \.self) { level in
-                LevelRowView(
-                    title: Level.title(level),
-                    subtitle: Level.description(level),
-                    mastered: store.masteredCount(for: level),
-                    total: store.totalCount(for: level),
-                    action: { onSelect(level) }
-                )
-            }
+    private func levelDescription(_ level: Int) -> String {
+        switch level {
+        case 500: return "基礎レベル・必須単語"
+        case 600: return "初中級レベル"
+        case 700: return "中級レベル"
+        case 800: return "中上級レベル"
+        case 900: return "上級レベル"
+        default:  return ""
         }
     }
 }
@@ -132,7 +129,7 @@ struct ModeSelectView: View {
                     VStack(spacing: 6) {
                         Text("出題範囲を選択")
                             .font(.title3.bold())
-                        Text(Level.title(level))
+                        Text("TOEIC \(level)点レベル")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -189,7 +186,7 @@ struct ModeSelectView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle(Level.title(level))
+            .navigationTitle("TOEIC \(level)点")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .toolbar {
@@ -269,7 +266,7 @@ struct StudyView: View {
                     if isRevealed { handleNext() }
                 }
             }
-            .navigationTitle(Level.title(level))
+            .navigationTitle("TOEIC \(level)点")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .toolbar {
