@@ -226,23 +226,66 @@ function LearningApp() {
   }
   function wordCard(w: Word, showMeaning: boolean) {
     const studying = screen === "study";
+    const tapHint = showMeaning ? "タップして次へ" : "タップして意味を表示";
+    function tappable(content: React.ReactNode) {
+      return studying ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityHint={tapHint}
+          onPress={() => showMeaning ? advanceCard() : setRevealed(true)}
+          style={{ flexGrow: 1, flexShrink: 1, paddingVertical: 8 }}
+        >
+          {content}
+        </Pressable>
+      ) : <View style={{ flexGrow: 1, flexShrink: 1 }}>{content}</View>;
+    }
+    function audioButton(value: string, label: string) {
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityHint="英語で読み上げます"
+          onPress={() => speak(value)}
+          style={({ pressed }) => ({
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: c.soft,
+            opacity: pressed ? 0.65 : 1,
+            flexShrink: 0,
+          })}
+        >
+          <Text accessible={false} style={{ fontSize: 21 }}>🔊</Text>
+        </Pressable>
+      );
+    }
     const cardContent = (
       <>
-        <Text selectable={!studying} style={[s.word, { color: c.ink }]}>
-          {w.word}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          {tappable(
+            <Text selectable={!studying} style={[s.word, { color: c.ink }]}>
+              {w.word}
+            </Text>
+          )}
+          {audioButton(w.word, `${w.word}の発音を聞く`)}
+        </View>
         {showMeaning && (
           <View style={[s.meaning, { borderTopColor: c.line }]}>
-            <Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>
+            {tappable(<Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>)}
             <View style={{ gap: 6 }}>
-              {text(w.example, 16, c.muted)}
-              {text(w.example_ja, 14, c.muted)}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                {tappable(text(w.example, 16, c.muted))}
+                {audioButton(w.example, "英語の例文を聞く")}
+              </View>
+              {tappable(text(w.example_ja, 14, c.muted))}
             </View>
           </View>
         )}
-        {studying && (
-          <View style={{ paddingTop: 24, alignItems: "center" }}>
-            {text(showMeaning ? "タップして次へ" : "タップして意味を表示", 13, c.muted)}
+        {studying && tappable(
+          <View style={{ paddingTop: 16, alignItems: "center" }}>
+            {text(tapHint, 13, c.muted)}
           </View>
         )}
       </>
@@ -269,19 +312,7 @@ function LearningApp() {
             </Pressable>
           )}
         </View>
-        {button("発音を聞く", () => speak(w.word), true)}
-        {studying ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${w.word}。${showMeaning ? `${w.meaning}。${w.example}。${w.example_ja}。タップして次へ` : "タップして意味を表示"}`}
-            onPress={() => showMeaning ? advanceCard() : setRevealed(true)}
-            style={{ paddingVertical: 12, gap: 16 }}
-          >
-            {cardContent}
-          </Pressable>
-        ) : (
-          cardContent
-        )}
+        {cardContent}
       </View>
     );
   }
