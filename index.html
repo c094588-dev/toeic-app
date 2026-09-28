@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>英単語学習アプリ</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
   <style>
     .slide-out-left  { animation: slideOutLeft  0.18s ease-in forwards; }
     .slide-out-right { animation: slideOutRight 0.18s ease-in forwards; }
@@ -21,7 +22,10 @@
   <!-- ヘッダー -->
   <header class="flex justify-between items-center px-4 py-3 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-sm">
     <h1 class="text-lg font-bold dark:text-white">英単語学習</h1>
-    <button id="toggleTheme" class="text-xl px-2">🌙</button>
+    <div class="flex items-center gap-2">
+      <button id="quizBtn" class="px-3 py-1 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition">📝 4択クイズ</button>
+      <button id="toggleTheme" class="text-xl px-2">🌙</button>
+    </div>
   </header>
 
   <!-- フィルターバー（スコアバンド） -->
@@ -118,7 +122,69 @@
     </div>
   </footer>
 
+  <!-- 4択クイズ（全画面） -->
+  <section id="quizView" class="hidden fixed inset-0 z-10 bg-gray-100 dark:bg-gray-900 flex flex-col" style="padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);">
+    <header class="flex justify-between items-center px-4 py-3 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-sm">
+      <button id="quizCloseBtn" class="text-blue-500 text-sm font-semibold">← 戻る</button>
+      <h2 id="quizTitle" class="text-base font-bold dark:text-white">4択クイズ</h2>
+      <span class="w-12"></span>
+    </header>
+
+    <!-- 問題 -->
+    <div id="quizQuestion" class="flex-grow flex flex-col w-full max-w-md mx-auto px-4 py-4">
+      <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+        <span id="quizProgress">1 / 10</span>
+        <span class="font-semibold text-green-500">正解 <span id="quizCorrect">0</span></span>
+      </div>
+      <div class="h-1.5 mt-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+        <div id="quizBar" class="h-full bg-blue-500 transition-all" style="width:0%"></div>
+      </div>
+
+      <div class="flex-grow flex flex-col items-center justify-center py-6">
+        <div class="flex items-center gap-3">
+          <p id="quizWord" class="text-4xl font-bold text-center dark:text-white"></p>
+          <button id="quizSpeak" class="text-2xl" aria-label="発音を聞く">🔊</button>
+        </div>
+        <p id="quizExample" class="hidden mt-4 text-sm text-gray-500 dark:text-gray-400 italic text-center"></p>
+      </div>
+
+      <div id="quizChoices" class="flex flex-col gap-2"></div>
+
+      <button id="quizNextBtn" class="invisible mt-4 w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold transition">次へ</button>
+    </div>
+
+    <!-- 結果 -->
+    <div id="quizResult" class="hidden flex-grow overflow-y-auto w-full max-w-md mx-auto px-4 py-6">
+      <div class="text-center">
+        <p id="quizScore" class="text-5xl font-bold dark:text-white"></p>
+        <p id="quizMessage" class="mt-2 text-gray-500 dark:text-gray-400"></p>
+      </div>
+      <div id="quizWrongArea" class="mt-6">
+        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">間違えた単語（「まだ」に追加しました）</p>
+        <ul id="quizWrongList" class="bg-white dark:bg-gray-800 rounded-xl divide-y dark:divide-gray-700"></ul>
+      </div>
+      <div class="mt-6 flex flex-col gap-2">
+        <button id="quizRetryBtn" class="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold transition">もう一度挑戦する</button>
+        <button id="quizBackBtn" class="w-full py-3 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold transition">戻る</button>
+      </div>
+    </div>
+  </section>
+
   <style>
+    .quiz-choice {
+      width: 100%;
+      text-align: left;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: white;
+      color: #111827;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s;
+    }
+    .dark .quiz-choice { background: #1f2937; color: #f3f4f6; }
+    .quiz-choice.correct { background: #22c55e; color: white; }
+    .quiz-choice.wrong   { background: #ef4444; color: white; }
+    .quiz-choice.dim     { opacity: 0.5; }
     .band-chip, .status-chip {
       padding: 4px 14px;
       border-radius: 9999px;
@@ -165,8 +231,14 @@
     let currentIndex = 0;
     let selectedBand = '';
     let selectedStatus = '';
-    let masteredIds = new Set(JSON.parse(localStorage.getItem('masteredIds') || '[]'));
-    let notYetIds   = new Set(JSON.parse(localStorage.getItem('notYetIds')   || '[]'));
+    // localStorage が使えない環境（プライベートブラウズ等）でも動くようにする
+    const storage = {
+      get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+      set(key, value) { try { localStorage.setItem(key, value); } catch {} },
+    };
+    const loadIds = key => { try { return new Set(JSON.parse(storage.get(key) || '[]')); } catch { return new Set(); } };
+    let masteredIds = loadIds('masteredIds');
+    let notYetIds   = loadIds('notYetIds');
 
     // ---- フィルター適用 ----
     function filteredWords() {
@@ -188,8 +260,8 @@
 
     // ---- 保存 ----
     function saveStatus() {
-      localStorage.setItem('masteredIds', JSON.stringify([...masteredIds]));
-      localStorage.setItem('notYetIds',   JSON.stringify([...notYetIds]));
+      storage.set('masteredIds', JSON.stringify([...masteredIds]));
+      storage.set('notYetIds',   JSON.stringify([...notYetIds]));
     }
 
     // ---- 表示 ----
@@ -357,8 +429,8 @@
     });
 
     // ---- ダークモード ----
-    let isDark = localStorage.getItem('theme') === 'dark' ||
-      (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    let isDark = storage.get('theme') === 'dark' ||
+      (!storage.get('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
     function applyTheme() {
       document.documentElement.classList.toggle('dark', isDark);
@@ -367,7 +439,7 @@
     applyTheme();
     document.getElementById('toggleTheme').addEventListener('click', () => {
       isDark = !isDark;
-      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      storage.set('theme', isDark ? 'dark' : 'light');
       applyTheme();
     });
 
@@ -390,6 +462,157 @@
           if (words.length) currentIndex = (currentIndex - 1 + words.length) % words.length;
         });
       }
+    });
+
+    // ---- 4択クイズ ----
+    const QUIZ_COUNT = 10;
+    let quiz = [];
+    let quizIndex = 0;
+    let quizCorrect = 0;
+    let quizWrong = [];
+    let quizAnswered = false;
+
+    const shuffle = arr => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+
+    // 選択中のレベルから出題。覚えていない単語を優先する
+    function makeQuiz() {
+      const pool = allWords.filter(w => !selectedBand || String(w.score_band) === selectedBand);
+      const unmastered = shuffle(pool.filter(w => !masteredIds.has(w.No)));
+      const mastered   = shuffle(pool.filter(w =>  masteredIds.has(w.No)));
+      const targets = shuffle([...unmastered, ...mastered].slice(0, QUIZ_COUNT));
+
+      return targets.map(word => {
+        // 選択肢は同じレベルから。正解と同じ意味・重複した意味は除く
+        const sameBand = allWords.filter(w => w.score_band === word.score_band);
+        const distractors = [];
+        for (const c of shuffle(sameBand)) {
+          if (c.meaning !== word.meaning && !distractors.includes(c.meaning)) distractors.push(c.meaning);
+          if (distractors.length === 3) break;
+        }
+        if (distractors.length < 3) return null;
+        const choices = shuffle([...distractors, word.meaning]);
+        return { word, choices, correctIndex: choices.indexOf(word.meaning) };
+      }).filter(Boolean);
+    }
+
+    function startQuiz() {
+      quiz = makeQuiz();
+      quizIndex = 0;
+      quizCorrect = 0;
+      quizWrong = [];
+      document.getElementById('quizTitle').textContent =
+        selectedBand ? `TOEIC ${selectedBand}点 クイズ` : '4択クイズ（全レベル）';
+      document.getElementById('quizView').classList.remove('hidden');
+      document.getElementById('quizResult').classList.add('hidden');
+      document.getElementById('quizQuestion').classList.remove('hidden');
+      renderQuestion();
+    }
+
+    function closeQuiz() {
+      document.getElementById('quizView').classList.add('hidden');
+      renderCard(null);
+    }
+
+    function renderQuestion() {
+      const q = quiz[quizIndex];
+      quizAnswered = false;
+      document.getElementById('quizProgress').textContent = `${quizIndex + 1} / ${quiz.length}`;
+      document.getElementById('quizCorrect').textContent = quizCorrect;
+      document.getElementById('quizBar').style.width = `${quizIndex / quiz.length * 100}%`;
+      document.getElementById('quizWord').textContent = q.word.word;
+      const ex = document.getElementById('quizExample');
+      ex.textContent = q.word.example;
+      ex.classList.add('hidden');
+
+      const box = document.getElementById('quizChoices');
+      box.innerHTML = '';
+      q.choices.forEach((text, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-choice';
+        btn.textContent = text;
+        btn.addEventListener('click', () => answerQuiz(i));
+        box.appendChild(btn);
+      });
+
+      const next = document.getElementById('quizNextBtn');
+      next.classList.add('invisible');
+      next.textContent = quizIndex + 1 === quiz.length ? '結果を見る' : '次へ';
+    }
+
+    function answerQuiz(choice) {
+      if (quizAnswered) return;
+      quizAnswered = true;
+      const q = quiz[quizIndex];
+      const buttons = document.querySelectorAll('#quizChoices .quiz-choice');
+      buttons.forEach((b, i) => {
+        if (i === q.correctIndex) { b.classList.add('correct'); b.textContent = '✓ ' + b.textContent; }
+        else if (i === choice)    { b.classList.add('wrong');   b.textContent = '✕ ' + b.textContent; }
+        else                        b.classList.add('dim');
+      });
+
+      if (choice === q.correctIndex) {
+        quizCorrect++;
+      } else {
+        quizWrong.push(q.word);
+        notYetIds.add(q.word.No);
+        masteredIds.delete(q.word.No);
+        saveStatus();
+      }
+      document.getElementById('quizCorrect').textContent = quizCorrect;
+      document.getElementById('quizExample').classList.remove('hidden');
+      document.getElementById('quizNextBtn').classList.remove('invisible');
+    }
+
+    function showQuizResult() {
+      document.getElementById('quizQuestion').classList.add('hidden');
+      document.getElementById('quizResult').classList.remove('hidden');
+      document.getElementById('quizScore').textContent = `${quizCorrect} / ${quiz.length}`;
+      const rate = quizCorrect / Math.max(quiz.length, 1);
+      document.getElementById('quizMessage').textContent =
+        rate === 1 ? '全問正解！' : rate >= 0.8 ? 'よくできました' : rate >= 0.5 ? 'あと少し！' : 'フラッシュカードで復習しよう';
+
+      const list = document.getElementById('quizWrongList');
+      list.innerHTML = '';
+      quizWrong.forEach(w => {
+        const li = document.createElement('li');
+        li.className = 'flex justify-between gap-4 px-4 py-3 text-sm';
+        const en = document.createElement('span');
+        en.className = 'font-semibold dark:text-white';
+        en.textContent = w.word;
+        const ja = document.createElement('span');
+        ja.className = 'text-gray-500 dark:text-gray-400 text-right';
+        ja.textContent = w.meaning;
+        li.append(en, ja);
+        list.appendChild(li);
+      });
+      document.getElementById('quizWrongArea').classList.toggle('hidden', quizWrong.length === 0);
+    }
+
+    function speak(text) {
+      if (!('speechSynthesis' in window)) return;
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = 0.9;
+      speechSynthesis.speak(u);
+    }
+
+    document.getElementById('quizBtn').addEventListener('click', startQuiz);
+    document.getElementById('quizCloseBtn').addEventListener('click', closeQuiz);
+    document.getElementById('quizBackBtn').addEventListener('click', closeQuiz);
+    document.getElementById('quizRetryBtn').addEventListener('click', startQuiz);
+    document.getElementById('quizSpeak').addEventListener('click', () => speak(quiz[quizIndex].word.word));
+    document.getElementById('quizNextBtn').addEventListener('click', () => {
+      quizIndex++;
+      if (quizIndex >= quiz.length) showQuizResult();
+      else renderQuestion();
     });
 
     // ---- データ読み込み ----
