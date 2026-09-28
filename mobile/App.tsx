@@ -127,10 +127,10 @@ function LearningApp() {
     answerLock.current = false;
     go("quiz");
   }
-  function markCard(value: boolean) {
+  function advanceCard(mastered = false) {
     if (!word || answerLock.current) return;
     answerLock.current = true;
-    record(word.No, value);
+    if (mastered) record(word.No, true);
     void Haptics.selectionAsync().catch(() => {});
     void Speech.stop();
     setRevealed(false);
@@ -225,16 +225,12 @@ function LearningApp() {
     );
   }
   function wordCard(w: Word, showMeaning: boolean) {
-    return (
-      <View style={[s.card, { backgroundColor: c.card, borderColor: c.line }]}>
-        <View style={s.row}>
-          {text(`${w.score_band} LEVEL`, 12, c.accent)}
-          {text(w.importance, 12, c.muted)}
-        </View>
-        <Text selectable style={[s.word, { color: c.ink }]}>
+    const studying = screen === "study";
+    const cardContent = (
+      <>
+        <Text selectable={!studying} style={[s.word, { color: c.ink }]}>
           {w.word}
         </Text>
-        {button("発音を聞く", () => speak(w.word), true)}
         {showMeaning && (
           <View style={[s.meaning, { borderTopColor: c.line }]}>
             <Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>
@@ -243,6 +239,48 @@ function LearningApp() {
               {text(w.example_ja, 14, c.muted)}
             </View>
           </View>
+        )}
+        {studying && (
+          <View style={{ paddingTop: 24, alignItems: "center" }}>
+            {text(showMeaning ? "タップして次へ" : "タップして意味を表示", 13, c.muted)}
+          </View>
+        )}
+      </>
+    );
+    return (
+      <View style={[s.card, { backgroundColor: c.card, borderColor: c.line }]}>
+        <View style={s.row}>
+          {text(`${w.score_band} LEVEL`, 12, c.accent)}
+          {studying && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="覚えたとして保存して次へ"
+              onPress={() => advanceCard(true)}
+              style={({ pressed }) => ({
+                minHeight: 44,
+                paddingHorizontal: 16,
+                justifyContent: "center",
+                borderRadius: 22,
+                backgroundColor: c.soft,
+                opacity: pressed ? 0.65 : 1,
+              })}
+            >
+              {text("覚えた ✓", 14, c.accent)}
+            </Pressable>
+          )}
+        </View>
+        {button("発音を聞く", () => speak(w.word), true)}
+        {studying ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${w.word}。${showMeaning ? `${w.meaning}。${w.example}。${w.example_ja}。タップして次へ` : "タップして意味を表示"}`}
+            onPress={() => showMeaning ? advanceCard() : setRevealed(true)}
+            style={{ paddingVertical: 12, gap: 16 }}
+          >
+            {cardContent}
+          </Pressable>
+        ) : (
+          cardContent
         )}
       </View>
     );
@@ -388,18 +426,7 @@ function LearningApp() {
                   </View>
                   {meter(index, queue.length)}
                   {wordCard(word, revealed)}
-                  {!revealed ? (
-                    button("意味を表示", () => setRevealed(true))
-                  ) : (
-                    <View style={{ flexDirection: "row", gap: 12 }}>
-                      <View style={{ flex: 1 }}>
-                        {button("まだ", () => markCard(false), true)}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        {button("覚えた ✓", () => markCard(true))}
-                      </View>
-                    </View>
-                  )}
+
                 </>
               ) : (
                 <>
