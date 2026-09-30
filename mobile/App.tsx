@@ -283,11 +283,6 @@ function LearningApp() {
             </View>
           </View>
         )}
-        {studying && tappable(
-          <View style={{ paddingTop: 16, alignItems: "center" }}>
-            {text(tapHint, 13, c.muted)}
-          </View>
-        )}
       </>
     );
     return (
@@ -334,7 +329,13 @@ function LearningApp() {
         )}
         <Text style={[s.brand, { color: c.ink }]}>{title}</Text>
       </View>
-      <ScrollView ref={scroll} contentContainerStyle={s.content}>
+      <ScrollView
+        ref={scroll}
+        contentContainerStyle={[
+          s.content,
+          screen === "study" && word && { flexGrow: 1, paddingBottom: 0 },
+        ]}
+      >
         {!!error && (
           <View style={[s.notice, { backgroundColor: c.soft }]}>
             {text(error, 14)}
@@ -349,7 +350,7 @@ function LearningApp() {
             )}
           </View>
         ) : (
-          <Animated.View style={{ opacity: fade, gap: 18 }}>
+          <Animated.View style={{ opacity: fade, gap: 18, flexGrow: screen === "study" && word ? 1 : 0 }}>
             {screen === "home" && (
               <>
                 {heading(
@@ -457,7 +458,14 @@ function LearningApp() {
                   </View>
                   {meter(index, queue.length)}
                   {wordCard(word, revealed)}
-
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={revealed ? "タップして次へ" : "タップして意味を表示"}
+                    onPress={() => revealed ? advanceCard() : setRevealed(true)}
+                    style={s.studyTapArea}
+                  >
+                    {text(revealed ? "タップして次へ" : "タップして意味を表示", 13, c.muted)}
+                  </Pressable>
                 </>
               ) : (
                 <>
@@ -616,6 +624,17 @@ const s = StyleSheet.create({
     paddingBottom: 44,
   },
   heading: { gap: 12, paddingVertical: 18 },
+  studyTapArea: {
+    flexGrow: 1,
+    minHeight: 120,
+    marginTop: -18,
+    marginHorizontal: -22,
+    paddingTop: 34,
+    paddingBottom: 24,
+    paddingHorizontal: 22,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
   hero: {
     fontSize: 34,
     lineHeight: 46,
