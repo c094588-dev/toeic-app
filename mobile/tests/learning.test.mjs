@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { makeQuiz, mark, parseProgress, studyWords } from "../src/learning.ts";
+import { makeQuiz, mark, parseProgress, restoreProgress, studyWords } from "../src/learning.ts";
 const words = JSON.parse(
   readFileSync(new URL("../../words.json", import.meta.url)),
 );
@@ -69,4 +69,20 @@ test("全例文に日本語訳があり、英語の例文も保持されてい�
     assert.ok(typeof w.example === "string" && w.example.trim(), `英語例文: ${w.No}`);
     assert.ok(typeof w.example_ja === "string" && /[ぁ-んァ-ヶ一-龯]/u.test(w.example_ja), `日本語訳: ${w.No}`);
   }
+});
+
+test("壊れた保存データは空の進捗で再開し、corrupt で知らせる", () => {
+  assert.deepEqual(restoreProgress("broken", ids), {
+    progress: { mastered: [], notYet: [] },
+    corrupt: true,
+  });
+  assert.deepEqual(restoreProgress("{}", ids).corrupt, true);
+  assert.deepEqual(restoreProgress(null, ids), {
+    progress: { mastered: [], notYet: [] },
+    corrupt: false,
+  });
+  assert.deepEqual(
+    restoreProgress('{"version":1,"mastered":[1],"notYet":[2]}', ids),
+    { progress: { mastered: [1], notYet: [2] }, corrupt: false },
+  );
 });

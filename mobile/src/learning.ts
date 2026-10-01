@@ -29,15 +29,27 @@ export function parseProgress(
       ),
     ),
   ];
+  const masteredSet = new Set(mastered);
   const notYet = [
     ...new Set<number>(
       data.notYet.filter(
         (id: unknown) =>
-          typeof id === "number" && validIds.has(id) && !mastered.includes(id),
+          typeof id === "number" && validIds.has(id) && !masteredSet.has(id),
       ),
     ),
   ];
   return { mastered, notYet };
+}
+/** 保存データを読み込む。壊れていれば空の進捗で始め、元データを退避できるよう corrupt で知らせる */
+export function restoreProgress(
+  raw: string | null,
+  validIds: Set<number>,
+): { progress: Progress; corrupt: boolean } {
+  try {
+    return { progress: parseProgress(raw, validIds), corrupt: false };
+  } catch {
+    return { progress: emptyProgress(), corrupt: true };
+  }
 }
 export function mark(
   progress: Progress,
@@ -69,11 +81,11 @@ export function studyWords(
   progress: Progress,
   onlyUnmastered: boolean,
 ): Word[] {
+  const mastered = new Set(progress.mastered);
   return shuffle(
     words.filter(
       (w) =>
-        w.score_band === band &&
-        (!onlyUnmastered || !progress.mastered.includes(w.No)),
+        w.score_band === band && (!onlyUnmastered || !mastered.has(w.No)),
     ),
   );
 }
@@ -84,10 +96,11 @@ export function makeQuiz(
   count = 10,
 ): Question[] {
   const pool = words.filter((w) => w.score_band === band);
+  const mastered = new Set(progress.mastered);
   const targets = shuffle(
     [
-      ...shuffle(pool.filter((w) => !progress.mastered.includes(w.No))),
-      ...shuffle(pool.filter((w) => progress.mastered.includes(w.No))),
+      ...shuffle(pool.filter((w) => !mastered.has(w.No))),
+      ...shuffle(pool.filter((w) => mastered.has(w.No))),
     ].slice(0, count),
   );
   return targets.flatMap((word) => {

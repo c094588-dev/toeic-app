@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
@@ -55,7 +55,17 @@ function LearningApp() {
         accent: "#176F66",
         soft: "#E7F2EE",
       };
-  const { progress, ready, error, record, retry } = useProgress(validIds);
+  const { progress, ready, error, notice, dismissNotice, record, retry } =
+    useProgress(validIds);
+  // レベルごとの習得数（配列の includes を毎回回さないよう Set で集計）
+  const masteredByBand = useMemo(() => {
+    const masteredSet = new Set(progress.mastered);
+    const counts = new Map<number, number>();
+    for (const w of words)
+      if (masteredSet.has(w.No))
+        counts.set(w.score_band, (counts.get(w.score_band) ?? 0) + 1);
+    return counts;
+  }, [progress.mastered]);
   const [screen, setScreen] = useState<Screen>("home");
   const [band, setBand] = useState(500);
   const [queue, setQueue] = useState<Word[]>([]);
@@ -72,9 +82,7 @@ function LearningApp() {
   const word = queue[index];
   const question = questions[index];
   const total = words.filter((w) => w.score_band === band).length;
-  const mastered = words.filter(
-    (w) => w.score_band === band && progress.mastered.includes(w.No),
-  ).length;
+  const mastered = masteredByBand.get(band) ?? 0;
   const title = screen === "home" ? "単語ノート" : `TOEIC ${band}`;
   function go(next: Screen) {
     void Speech.stop();
@@ -127,10 +135,11 @@ function LearningApp() {
     answerLock.current = false;
     go("quiz");
   }
-  function advanceCard(mastered = false) {
+  /** 次のカードへ。markAs を指定すると「覚えた」(true) /「まだ」(false) を記録する */
+  function advanceCard(markAs?: boolean) {
     if (!word || answerLock.current) return;
     answerLock.current = true;
-    if (mastered) record(word.No, true);
+    if (markAs !== undefined) record(word.No, markAs);
     void Haptics.selectionAsync().catch(() => {});
     void Speech.stop();
     setRevealed(false);
@@ -261,6 +270,28 @@ function LearningApp() {
         </Pressable>
       );
     }
+    function markButton(label: string, a11yLabel: string, value: boolean) {
+      const color = value ? c.accent : dark ? "#FFA487" : "#9A4329";
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={a11yLabel}
+          onPress={() => advanceCard(value)}
+          style={({ pressed }) => ({
+            minHeight: 44,
+            paddingHorizontal: 16,
+            justifyContent: "center",
+            borderRadius: 22,
+            backgroundColor: value ? c.soft : c.card,
+            borderWidth: value ? 0 : 1,
+            borderColor: c.line,
+            opacity: pressed ? 0.65 : 1,
+          })}
+        >
+          {text(label, 14, color)}
+        </Pressable>
+      );
+    }
     const cardContent = (
       <>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -290,21 +321,10 @@ function LearningApp() {
         <View style={s.row}>
           {text(`${w.score_band} LEVEL`, 12, c.accent)}
           {studying && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="覚えたとして保存して次へ"
-              onPress={() => advanceCard(true)}
-              style={({ pressed }) => ({
-                minHeight: 44,
-                paddingHorizontal: 16,
-                justifyContent: "center",
-                borderRadius: 22,
-                backgroundColor: c.soft,
-                opacity: pressed ? 0.65 : 1,
-              })}
-            >
-              {text("覚えた ✓", 14, c.accent)}
-            </Pressable>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {markButton("まだ", "まだとして保存して次へ", false)}
+              {markButton("覚えた ✓", "覚えたとして保存して次へ", true)}
+            </View>
           )}
         </View>
         {cardContent}
@@ -336,6 +356,12 @@ function LearningApp() {
           screen === "study" && word && { flexGrow: 1, paddingBottom: 0 },
         ]}
       >
+        {!!notice && (
+          <View style={[s.notice, { backgroundColor: c.soft }]}>
+            {text(notice, 14)}
+            {button("閉じる", dismissNotice, true)}
+          </View>
+        )}
         {!!error && (
           <View style={[s.notice, { backgroundColor: c.soft }]}>
             {text(error, 14)}
@@ -370,10 +396,7 @@ function LearningApp() {
                 </View>
                 {bands.map((b, i) => {
                   const n = words.filter((w) => w.score_band === b).length;
-                  const m = words.filter(
-                    (w) =>
-                      w.score_band === b && progress.mastered.includes(w.No),
-                  ).length;
+                  const m = masteredByBand.get(b) ?? 0;
                   return (
                     <Pressable
                       key={b}
