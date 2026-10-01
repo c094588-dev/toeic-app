@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   Animated,
   BackHandler,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -36,28 +39,42 @@ export default function App() {
 }
 function LearningApp() {
   const dark = useColorScheme() === "dark";
+  const { width } = useWindowDimensions();
+  const wide = width >= 760;
   const c = dark
     ? {
-        bg: "#111B22",
-        card: "#1C2932",
-        ink: "#F2F6F5",
-        muted: "#A8BABD",
-        line: "#34454C",
-        accent: "#80DACC",
-        soft: "#243E3F",
+        bg: "#181C19",
+        card: "#222824",
+        ink: "#F1F1E7",
+        muted: "#ADB6AC",
+        line: "#3C443B",
+        accent: "#D5ED89",
+        soft: "#303D26",
+        panel: "#D5ED89",
+        panelInk: "#25301D",
       }
     : {
-        bg: "#F5F6F2",
-        card: "#FFFFFF",
-        ink: "#172F36",
-        muted: "#62777B",
-        line: "#E0E7E4",
-        accent: "#176F66",
-        soft: "#E7F2EE",
+        bg: "#F4F3EB",
+        card: "#FDFDF8",
+        ink: "#242D27",
+        muted: "#667164",
+        line: "#DADDD1",
+        accent: "#405D36",
+        soft: "#E8EDD9",
+        panel: "#27372D",
+        panelInk: "#F1F3E7",
       };
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const sub = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReduceMotion,
+    );
+    return () => sub.remove();
+  }, []);
   const { progress, ready, error, notice, dismissNotice, record, retry } =
     useProgress(validIds);
-  // レベルごとの習得数（配列の includes を毎回回さないよう Set で集計）
   const masteredByBand = useMemo(() => {
     const masteredSet = new Set(progress.mastered);
     const counts = new Map<number, number>();
@@ -78,6 +95,7 @@ function LearningApp() {
   const [onlyUnmastered, setOnlyUnmastered] = useState(true);
   const answerLock = useRef(false);
   const fade = useRef(new Animated.Value(1)).current;
+  const revealFade = useRef(new Animated.Value(0)).current;
   const scroll = useRef<ScrollView>(null);
   const word = queue[index];
   const question = questions[index];
@@ -104,16 +122,25 @@ function LearningApp() {
     fade.setValue(0);
     Animated.timing(fade, {
       toValue: 1,
-      duration: 180,
+      duration: reduceMotion ? 0 : 260,
       useNativeDriver: true,
     }).start();
-  }, [screen, index]);
+  }, [screen, index, reduceMotion]);
   useEffect(
     () => () => {
       void Speech.stop();
     },
     [],
   );
+  useEffect(() => {
+    revealFade.setValue(revealed ? 0 : 1);
+    if (revealed)
+      Animated.timing(revealFade, {
+        toValue: 1,
+        duration: reduceMotion ? 0 : 220,
+        useNativeDriver: true,
+      }).start();
+  }, [revealed, reduceMotion]);
   function speak(text: string) {
     void Speech.stop();
     Speech.speak(text, { language: "en-US", rate: 0.88, onError: () => {} });
@@ -135,7 +162,6 @@ function LearningApp() {
     answerLock.current = false;
     go("quiz");
   }
-  /** 次のカードへ。markAs を指定すると「覚えた」(true) /「まだ」(false) を記録する */
   function advanceCard(markAs?: boolean) {
     if (!word || answerLock.current) return;
     answerLock.current = true;
@@ -171,10 +197,20 @@ function LearningApp() {
     else setIndex(index + 1);
   }
   const text = (value: string, size = 16, color = c.ink) => (
-    <Text style={{ color, fontSize: size, lineHeight: size * 1.5 }}>
+    <Text style={{ color, fontSize: size, lineHeight: size * 1.55 }}>
       {value}
     </Text>
   );
+  function eyebrow(value: string, color = c.muted) {
+    return <Text style={[s.eyebrow, { color }]}>{value}</Text>;
+  }
+  function arrow(color = c.ink, diagonal = false) {
+    return (
+      <Text accessible={false} style={{ color, fontSize: 23, lineHeight: 28 }}>
+        {diagonal ? "↗" : "→"}
+      </Text>
+    );
+  }
   function button(
     label: string,
     onPress: () => void,
@@ -190,35 +226,37 @@ function LearningApp() {
         style={({ pressed }) => [
           s.button,
           {
-            backgroundColor: secondary ? c.soft : c.accent,
-            opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
+            backgroundColor: secondary ? c.soft : c.ink,
+            opacity: disabled ? 0.4 : pressed ? 0.8 : 1,
+            transform: [{ scale: pressed ? 0.985 : 1 }],
           },
         ]}
       >
-        <Text
-          style={[
-            s.buttonText,
-            { color: secondary ? c.accent : dark ? "#102A28" : "#FFFFFF" },
-          ]}
-        >
+        <Text style={[s.buttonText, { color: secondary ? c.ink : c.bg }]}>
           {label}
         </Text>
+        {arrow(secondary ? c.ink : c.bg)}
       </Pressable>
     );
   }
-  function meter(value: number, max: number) {
+  function meter(
+    value: number,
+    max: number,
+    inverse = false,
+    fillColor?: string,
+  ) {
     return (
       <View
         accessibilityRole="progressbar"
         accessibilityValue={{ min: 0, max, now: value }}
-        style={[s.track, { backgroundColor: c.line }]}
+        style={[s.track, { backgroundColor: inverse ? "#596750" : c.line }]}
       >
         <View
           style={{
             width: `${max ? Math.min(100, (value / max) * 100) : 0}%`,
-            height: 5,
-            backgroundColor: c.accent,
-            borderRadius: 5,
+            height: 3,
+            backgroundColor: fillColor ?? (inverse ? "#D5ED89" : c.accent),
+            borderRadius: 3,
           }}
         />
       </View>
@@ -227,133 +265,294 @@ function LearningApp() {
   function heading(kicker: string, main: string, subtitle: string) {
     return (
       <View style={s.heading}>
-        {text(kicker, 12, c.accent)}
-        <Text style={[s.hero, { color: c.ink }]}>{main}</Text>
+        {eyebrow(kicker, c.accent)}
+        <Text accessibilityRole="header" style={[s.hero, { color: c.ink }]}>
+          {main}
+        </Text>
         {text(subtitle, 14, c.muted)}
       </View>
     );
   }
+  function audioButton(value: string, label: string) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityHint="英語で読み上げます"
+        onPress={() => speak(value)}
+        style={({ pressed }) => [
+          s.audio,
+          { backgroundColor: c.soft, opacity: pressed ? 0.65 : 1 },
+        ]}
+      >
+        <View
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          style={{ width: 24, height: 24 }}
+        >
+          <View
+            style={{
+              position: "absolute",
+              left: 2,
+              top: 9,
+              width: 5,
+              height: 6,
+              borderRadius: 1,
+              backgroundColor: c.accent,
+            }}
+          />
+          <View
+            style={{
+              position: "absolute",
+              left: 5,
+              top: 5,
+              width: 0,
+              height: 0,
+              borderTopWidth: 7,
+              borderBottomWidth: 7,
+              borderRightWidth: 8,
+              borderTopColor: "transparent",
+              borderBottomColor: "transparent",
+              borderRightColor: c.accent,
+            }}
+          />
+          <View
+            style={{
+              position: "absolute",
+              left: 13,
+              top: 7,
+              width: 5,
+              height: 10,
+              borderRightWidth: 1.5,
+              borderColor: c.accent,
+              borderTopRightRadius: 8,
+              borderBottomRightRadius: 8,
+            }}
+          />
+          <View
+            style={{
+              position: "absolute",
+              left: 14,
+              top: 3,
+              width: 8,
+              height: 18,
+              borderRightWidth: 1.5,
+              borderColor: c.accent,
+              borderTopRightRadius: 12,
+              borderBottomRightRadius: 12,
+            }}
+          />
+        </View>
+      </Pressable>
+    );
+  }
   function wordCard(w: Word, showMeaning: boolean) {
     const studying = screen === "study";
+    const wordSize = Math.min(
+      54,
+      Math.max(22, (Math.min(width, 640) - 154) / (w.word.length * 0.48)),
+    );
     const tapHint = showMeaning ? "タップして次へ" : "タップして意味を表示";
     function tappable(content: React.ReactNode) {
       return studying ? (
         <Pressable
           accessibilityRole="button"
           accessibilityHint={tapHint}
-          onPress={() => showMeaning ? advanceCard() : setRevealed(true)}
-          style={{ flexGrow: 1, flexShrink: 1, paddingVertical: 8 }}
+          onPress={() => (showMeaning ? advanceCard() : setRevealed(true))}
+          style={s.tappable}
         >
           {content}
         </Pressable>
-      ) : <View style={{ flexGrow: 1, flexShrink: 1 }}>{content}</View>;
-    }
-    function audioButton(value: string, label: string) {
-      return (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={label}
-          accessibilityHint="英語で読み上げます"
-          onPress={() => speak(value)}
-          style={({ pressed }) => ({
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: c.soft,
-            opacity: pressed ? 0.65 : 1,
-            flexShrink: 0,
-          })}
-        >
-          <Text accessible={false} style={{ fontSize: 21 }}>🔊</Text>
-        </Pressable>
+      ) : (
+        <View style={s.tappable}>{content}</View>
       );
     }
-    function markButton(label: string, a11yLabel: string, value: boolean) {
-      const color = value ? c.accent : dark ? "#FFA487" : "#9A4329";
-      return (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={a11yLabel}
-          onPress={() => advanceCard(value)}
-          style={({ pressed }) => ({
-            minHeight: 44,
-            paddingHorizontal: 16,
-            justifyContent: "center",
-            borderRadius: 22,
-            backgroundColor: value ? c.soft : c.card,
-            borderWidth: value ? 0 : 1,
-            borderColor: c.line,
-            opacity: pressed ? 0.65 : 1,
-          })}
-        >
-          {text(label, 14, color)}
-        </Pressable>
-      );
-    }
-    const cardContent = (
-      <>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+    return (
+      <View
+        style={[s.wordCard, { backgroundColor: c.card, borderColor: c.line }]}
+      >
+        <View style={s.row}>
+          {eyebrow(`WORD ${String(w.No).padStart(4, "0")}`)}
+          {studying ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="覚えたとして保存して次へ"
+              onPress={() => advanceCard(true)}
+              style={({ pressed }) => [
+                s.mastery,
+                { backgroundColor: c.soft, opacity: pressed ? 0.65 : 1 },
+              ]}
+            >
+              {text("覚えた", 13, c.accent)}
+              {text("✓", 15, c.accent)}
+            </Pressable>
+          ) : (
+            eyebrow(`${w.score_band} LEVEL`, c.accent)
+          )}
+        </View>
+        <View style={[s.wordRow, { paddingVertical: studying ? 40 : 20 }]}>
           {tappable(
-            <Text selectable={!studying} style={[s.word, { color: c.ink }]}>
+            <Text
+              selectable={!studying}
+              style={[
+                s.word,
+                {
+                  color: c.ink,
+                  fontSize: wordSize,
+                  lineHeight: wordSize * 1.25,
+                },
+              ]}
+            >
               {w.word}
-            </Text>
+            </Text>,
           )}
           {audioButton(w.word, `${w.word}の発音を聞く`)}
         </View>
         {showMeaning && (
-          <View style={[s.meaning, { borderTopColor: c.line }]}>
-            {tappable(<Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>)}
-            <View style={{ gap: 6 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                {tappable(text(w.example, 16, c.muted))}
+          <Animated.View
+            style={[
+              s.meaning,
+              { borderTopColor: c.line, opacity: studying ? revealFade : 1 },
+            ]}
+          >
+            {tappable(
+              <Text style={[s.meaningText, { color: c.ink }]}>
+                {w.meaning}
+              </Text>,
+            )}
+            <View style={{ gap: 8, marginTop: 12 }}>
+              {eyebrow("IN CONTEXT", c.accent)}
+              <View style={s.wordRow}>
+                {tappable(
+                  <Text style={[s.example, { color: c.ink }]}>
+                    {w.example}
+                  </Text>,
+                )}
                 {audioButton(w.example, "英語の例文を聞く")}
               </View>
               {tappable(text(w.example_ja, 14, c.muted))}
             </View>
-          </View>
+          </Animated.View>
         )}
-      </>
-    );
-    return (
-      <View style={[s.card, { backgroundColor: c.card, borderColor: c.line }]}>
-        <View style={s.row}>
-          {text(`${w.score_band} LEVEL`, 12, c.accent)}
-          {studying && (
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {markButton("まだ", "まだとして保存して次へ", false)}
-              {markButton("覚えた ✓", "覚えたとして保存して次へ", true)}
-            </View>
-          )}
-        </View>
-        {cardContent}
+        {studying && !showMeaning && (
+          <Pressable
+            accessible={false}
+            onPress={() => setRevealed(true)}
+            style={{ height: 40 }}
+          />
+        )}
       </View>
     );
   }
+  function completion(
+    mark: string,
+    kicker: string,
+    main: string,
+    subtitle: string,
+  ) {
+    return (
+      <View
+        style={{
+          alignItems: "center",
+          paddingTop: 24,
+          paddingBottom: 16,
+          gap: 26,
+        }}
+      >
+        <View
+          style={[
+            s.completionSeal,
+            { backgroundColor: c.soft, borderColor: c.line },
+          ]}
+        >
+          <Text accessible={false} style={[s.sealText, { color: c.accent }]}>
+            {mark}
+          </Text>
+        </View>
+        <View style={{ alignItems: "center", gap: 14 }}>
+          {eyebrow(kicker, c.accent)}
+          <Text
+            accessibilityRole="header"
+            style={[s.hero, { color: c.ink, textAlign: "center" }]}
+          >
+            {main}
+          </Text>
+          <Text
+            style={{
+              color: c.muted,
+              fontSize: 14,
+              lineHeight: 23,
+              textAlign: "center",
+            }}
+          >
+            {subtitle}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  const studying = screen === "study" && !!word;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }}>
       <StatusBar style={dark ? "light" : "dark"} />
-      <View style={[s.header, { borderBottomColor: c.line }]}>
-        {screen !== "home" ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="前の画面に戻る"
-            onPress={back}
-            style={s.back}
-          >
-            {text("‹ 戻る", 16, c.accent)}
-          </Pressable>
-        ) : (
-          text("WORD / NOTE", 12, c.accent)
-        )}
-        <Text style={[s.brand, { color: c.ink }]}>{title}</Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: c.line }}>
+        <View style={[s.header, { maxWidth: screen === "home" ? 1040 : 640 }]}>
+          {screen === "home" ? (
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 9 }}
+            >
+              <View
+                accessible={false}
+                style={[s.brandMark, { backgroundColor: c.ink }]}
+              >
+                <View
+                  style={{
+                    width: 3,
+                    height: 15,
+                    backgroundColor: c.bg,
+                    transform: [{ rotate: "-18deg" }],
+                  }}
+                />
+                <View
+                  style={{
+                    width: 3,
+                    height: 15,
+                    backgroundColor: "#D5ED89",
+                    transform: [{ rotate: "18deg" }],
+                  }}
+                />
+              </View>
+              <Text style={[s.brand, { color: c.ink }]}>
+                wordnote<Text style={{ color: c.accent }}>.</Text>
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="前の画面に戻る"
+              onPress={back}
+              style={s.back}
+            >
+              {text("←", 22)}
+              {text("戻る", 13, c.muted)}
+            </Pressable>
+          )}
+          {eyebrow(
+            screen === "home"
+              ? width < 360
+                ? "TOEIC / 1,500"
+                : "TOEIC / 1,500 WORDS"
+              : title.toUpperCase(),
+          )}
+        </View>
       </View>
       <ScrollView
         ref={scroll}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           s.content,
-          screen === "study" && word && { flexGrow: 1, paddingBottom: 0 },
+          { maxWidth: screen === "home" ? 1040 : 640 },
+          studying && { flexGrow: 1, paddingBottom: 0 },
         ]}
       >
         {!!notice && (
@@ -369,143 +568,427 @@ function LearningApp() {
           </View>
         )}
         {!ready ? (
-          <View style={s.heading}>
-            {text(
-              error ? "進捗を確認しています" : "学習の準備をしています…",
-              20,
-            )}
-          </View>
+          heading(
+            "GETTING READY",
+            "学習の準備をしています",
+            "まもなく、今日の一歩を。",
+          )
         ) : (
-          <Animated.View style={{ opacity: fade, gap: 18, flexGrow: screen === "study" && word ? 1 : 0 }}>
+          <Animated.View
+            style={{
+              opacity: fade,
+              gap: 20,
+              flexGrow: studying ? 1 : 0,
+              transform: [
+                {
+                  translateY: reduceMotion
+                    ? 0
+                    : fade.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [10, 0],
+                      }),
+                },
+              ],
+            }}
+          >
             {screen === "home" && (
               <>
-                {heading(
-                  "小さな積み重ね、大きな一歩。",
-                  "今日のひとことが、\n明日の自信に。",
-                  "1,500語から、あなたの目標に合うレベルを。",
-                )}
-                <View style={[s.summary, { backgroundColor: c.soft }]}>
-                  <View style={s.row}>
-                    {text("覚えた単語", 14, c.muted)}
-                    <Text style={[s.stat, { color: c.accent }]}>
-                      {progress.mastered.length}
-                      <Text style={{ fontSize: 14 }}> / 1,500</Text>
-                    </Text>
-                  </View>
-                  {meter(progress.mastered.length, 1500)}
-                </View>
-                {bands.map((b, i) => {
-                  const n = words.filter((w) => w.score_band === b).length;
-                  const m = masteredByBand.get(b) ?? 0;
-                  return (
-                    <Pressable
-                      key={b}
-                      accessibilityRole="button"
-                      accessibilityLabel={`TOEIC ${b}点レベル、${n}語中${m}語習得`}
-                      onPress={() => {
-                        setBand(b);
-                        go("mode");
+                <View
+                  style={[
+                    s.homeHero,
+                    wide && {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 44,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: wide ? 1 : undefined, gap: 14 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
                       }}
-                      style={({ pressed }) => [
-                        s.level,
+                    >
+                      <View style={[s.dot, { backgroundColor: c.accent }]} />
+                      {eyebrow("A LITTLE EVERY DAY", c.accent)}
+                    </View>
+                    <Text
+                      accessibilityRole="header"
+                      style={[
+                        s.editorialTitle,
                         {
-                          backgroundColor: c.card,
-                          borderColor: c.line,
-                          opacity: pressed ? 0.7 : 1,
+                          color: c.ink,
+                          fontSize: wide ? 88 : width < 360 ? 56 : 64,
+                          lineHeight: wide ? 90 : width < 360 ? 60 : 66,
                         },
                       ]}
                     >
-                      <View style={s.row}>
-                        <Text style={[s.levelNumber, { color: c.ink }]}>
-                          {b}
-                          <Text style={{ fontSize: 14 }}> 点レベル</Text>
+                      Words into
+                      <Text style={{ fontStyle: "italic" }}>{"\n"}worlds.</Text>
+                    </Text>
+                    <View style={{ gap: 8 }}>
+                      <Text
+                        style={{
+                          fontSize: width < 360 ? 17 : 19,
+                          fontWeight: "600",
+                          lineHeight: 29,
+                          color: c.ink,
+                        }}
+                      >
+                        ひとことずつ、世界がひらく。
+                      </Text>
+                      {text("今日の1語を、明日の自信に。", 14, c.muted)}
+                    </View>
+                  </View>
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    style={[
+                      s.artwork,
+                      {
+                        backgroundColor: c.soft,
+                        flexBasis: wide ? "40%" : undefined,
+                      },
+                      !wide && { height: 100, marginTop: 22 },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        s.orbit,
+                        {
+                          borderColor: c.accent,
+                          width: wide ? 210 : 116,
+                          height: wide ? 210 : 116,
+                          left: wide ? 28 : 26,
+                          top: wide ? 28 : -8,
+                        },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        s.orbit,
+                        {
+                          borderColor: c.accent,
+                          width: wide ? 210 : 116,
+                          height: wide ? 210 : 116,
+                          left: wide ? 112 : 96,
+                          top: wide ? 28 : -8,
+                        },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        s.artLetter,
+                        {
+                          color: c.accent,
+                          fontSize: wide ? 132 : 76,
+                          top: wide ? 44 : -4,
+                          left: wide ? 61 : 50,
+                        },
+                      ]}
+                    >
+                      a
+                    </Text>
+                    <Text
+                      style={[
+                        s.artLetter,
+                        {
+                          color: c.accent,
+                          fontSize: wide ? 132 : 76,
+                          top: wide ? 44 : -4,
+                          left: wide ? 174 : 126,
+                          fontStyle: "italic",
+                        },
+                      ]}
+                    >
+                      あ
+                    </Text>
+                    <View
+                      style={[
+                        s.artBadge,
+                        { backgroundColor: c.ink, right: 16, bottom: 14 },
+                      ]}
+                    >
+                      {eyebrow("EN → JA", c.bg)}
+                    </View>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    s.summary,
+                    {
+                      backgroundColor: c.panel,
+                      padding: wide ? 24 : 20,
+                      gap: wide ? 18 : 12,
+                    },
+                  ]}
+                >
+                  <View style={[s.row, { alignItems: "flex-start" }]}>
+                    <View style={{ gap: 8 }}>
+                      {eyebrow("YOUR COLLECTION", c.panelInk)}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "baseline",
+                          gap: 10,
+                        }}
+                      >
+                        <Text style={[s.stat, { color: c.panelInk }]}>
+                          {progress.mastered.length.toLocaleString()}
                         </Text>
-                        {text("→", 24, c.accent)}
+                        <Text
+                          style={{
+                            color: c.panelInk,
+                            opacity: 0.7,
+                            fontSize: 13,
+                          }}
+                        >
+                          {" "}
+                          / 1,500 語
+                        </Text>
                       </View>
-                      {text(labels[i], 14, c.muted)}
-                      {meter(m, n)}
-                      {text(`${m} / ${n} 語を習得`, 12, c.muted)}
-                    </Pressable>
-                  );
-                })}
-                {text("進捗はこの端末に保存されます。", 12, c.muted)}
+                    </View>
+                    <View
+                      style={[
+                        s.progressBadge,
+                        { borderColor: dark ? "#889B56" : "#64745C" },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color: c.panelInk,
+                          fontSize: 14,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {Math.round(progress.mastered.length / 15)}%
+                      </Text>
+                    </View>
+                  </View>
+                  {meter(
+                    progress.mastered.length,
+                    1500,
+                    !dark,
+                    dark ? c.panelInk : undefined,
+                  )}
+                  {text("覚えた言葉が、あなたの力になる。", 12, c.panelInk)}
+                </View>
+                <View style={[s.sectionHeader, { marginTop: 12 }]}>
+                  <Text
+                    style={{ color: c.ink, fontSize: 20, fontWeight: "600" }}
+                  >
+                    目標から、はじめる。
+                  </Text>
+                  {eyebrow("01 — 05")}
+                </View>
+                <View style={{ borderTopWidth: 1, borderColor: c.line }}>
+                  {bands.map((b, i) => {
+                    const n = words.filter((w) => w.score_band === b).length;
+                    const m = masteredByBand.get(b) ?? 0;
+                    return (
+                      <Pressable
+                        key={b}
+                        accessibilityRole="button"
+                        accessibilityLabel={`TOEIC ${b}点レベル、${n}語中${m}語習得`}
+                        onPress={() => {
+                          setBand(b);
+                          go("mode");
+                        }}
+                        style={({
+                          pressed,
+                          hovered,
+                        }: {
+                          pressed: boolean;
+                          hovered?: boolean;
+                        }) => [
+                          s.level,
+                          {
+                            borderBottomColor: c.line,
+                            backgroundColor:
+                              pressed || hovered ? c.soft : "transparent",
+                          },
+                        ]}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: wide ? 24 : 14,
+                          }}
+                        >
+                          {eyebrow(`0${i + 1}`)}
+                          <Text style={[s.levelNumber, { color: c.ink }]}>
+                            {b}
+                          </Text>
+                          <View style={{ flex: 1, gap: 5 }}>
+                            {text(labels[i], 13)}
+                            {text(`${m} / ${n} 語を習得`, 11, c.muted)}
+                          </View>
+                          <View style={[s.levelArrow, { borderColor: c.line }]}>
+                            {arrow(c.accent, true)}
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={[s.row, { paddingTop: 12, flexWrap: "wrap" }]}>
+                  {eyebrow("SMALL STEPS. REAL PROGRESS.")}
+                  {text("進捗はこの端末に保存されます。", 11, c.muted)}
+                </View>
               </>
             )}
             {screen === "mode" && (
               <>
-                {heading(
-                  "YOUR NEXT STEP",
-                  `${band}点への、一歩。`,
-                  `${total}語のうち、${mastered}語を習得済み。`,
-                )}
-                <View
-                  style={[
-                    s.card,
-                    { backgroundColor: c.card, borderColor: c.line },
-                  ]}
-                >
-                  {text("覚える", 24)}
-                  {text("意味を思い出してから、答え合わせ。", 14, c.muted)}
-                  {button(`覚えていない単語（${total - mastered}語）`, () =>
-                    startStudy(true),
-                  )}
-                  {button(
-                    `全ての単語（${total}語）`,
-                    () => startStudy(false),
-                    true,
+                <View style={[s.heading, { gap: 16 }]}>
+                  {eyebrow("YOUR NEXT CHAPTER", c.accent)}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "baseline",
+                      gap: 14,
+                    }}
+                  >
+                    <Text
+                      style={[
+                        s.scoreTitle,
+                        { color: c.ink, fontSize: width < 360 ? 76 : 92 },
+                      ]}
+                    >
+                      {band}
+                    </Text>
+                    {text("点への、一歩。", width < 360 ? 16 : 20)}
+                  </View>
+                  {text(labels[bands.indexOf(band)], 14, c.muted)}
+                  {meter(mastered, total)}
+                  {text(
+                    `${total}語のうち、${mastered}語を習得済み`,
+                    12,
+                    c.muted,
                   )}
                 </View>
                 <View
                   style={[
-                    s.card,
+                    s.modeCard,
                     { backgroundColor: c.card, borderColor: c.line },
                   ]}
                 >
-                  {text("確かめる", 24)}
-                  {text(
-                    "4択・10問。未習得の単語を優先して出題します。",
-                    14,
-                    c.muted,
-                  )}
-                  {button("4択クイズを始める →", startQuiz)}
-                  {text("間違えた単語は「まだ」に戻ります。", 12, c.muted)}
+                  <View style={s.row}>
+                    {eyebrow("01 / FLASHCARDS", c.accent)}
+                    <Text
+                      accessible={false}
+                      style={[s.modeGlyph, { color: c.accent }]}
+                    >
+                      Aa
+                    </Text>
+                  </View>
+                  <View style={{ gap: 8 }}>
+                    <Text
+                      accessibilityRole="header"
+                      style={[s.modeTitle, { color: c.ink }]}
+                    >
+                      言葉に、出会う。
+                    </Text>
+                    {text(
+                      "単語をめくって、意味と例文を自分のものに。",
+                      13,
+                      c.muted,
+                    )}
+                  </View>
+                  {button("未習得の単語を学ぶ", () => startStudy(true))}
+                  {button("全ての単語を復習", () => startStudy(false), true)}
+                </View>
+                <View
+                  style={[
+                    s.modeCard,
+                    { backgroundColor: c.soft, borderColor: c.line },
+                  ]}
+                >
+                  <View style={s.row}>
+                    {eyebrow("02 / QUICK QUIZ", c.accent)}
+                    <Text
+                      accessible={false}
+                      style={[s.modeGlyph, { color: c.accent }]}
+                    >
+                      ?
+                    </Text>
+                  </View>
+                  <View style={{ gap: 8 }}>
+                    <Text
+                      accessibilityRole="header"
+                      style={[s.modeTitle, { color: c.ink }]}
+                    >
+                      記憶を、確かめる。
+                    </Text>
+                    {text(
+                      "4択・10問。未習得の単語を優先して出題。",
+                      13,
+                      c.muted,
+                    )}
+                  </View>
+                  {button("クイズを始める", startQuiz)}
+                  {text("間違えた単語は、未習得に戻ります。", 11, c.muted)}
                 </View>
               </>
             )}
             {screen === "study" &&
               (word ? (
                 <>
-                  <View style={s.row}>
-                    {text("FLASHCARDS", 12, c.accent)}
-                    {text(`${index + 1} / ${queue.length}`, 14, c.muted)}
+                  <View style={s.sectionHeader}>
+                    {eyebrow("FLASHCARDS", c.accent)}
+                    <Text style={{ color: c.muted, fontSize: 13 }}>
+                      <Text style={{ color: c.ink, fontWeight: "600" }}>
+                        {String(index + 1).padStart(2, "0")}
+                      </Text>{" "}
+                      / {queue.length}
+                    </Text>
                   </View>
                   {meter(index, queue.length)}
                   {wordCard(word, revealed)}
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={revealed ? "タップして次へ" : "タップして意味を表示"}
-                    onPress={() => revealed ? advanceCard() : setRevealed(true)}
+                    accessibilityLabel={
+                      revealed ? "タップして次へ" : "タップして意味を表示"
+                    }
+                    onPress={() =>
+                      revealed ? advanceCard() : setRevealed(true)
+                    }
                     style={s.studyTapArea}
                   >
-                    {text(revealed ? "タップして次へ" : "タップして意味を表示", 13, c.muted)}
+                    <View style={[s.tapHint, { borderColor: c.line }]}>
+                      <View
+                        accessible={false}
+                        style={[s.dot, { backgroundColor: c.accent }]}
+                      />
+                      {text(
+                        revealed ? "タップして次へ" : "タップして意味を表示",
+                        12,
+                        c.muted,
+                      )}
+                      {arrow(c.accent)}
+                    </View>
                   </Pressable>
                 </>
               ) : (
                 <>
-                  {heading(
+                  {completion(
+                    "✓",
                     "ALL CLEAR",
                     "このレベルは習得済み！",
-                    "全ての単語でおさらいすることもできます。",
+                    "全ての単語で、おさらいしてみましょう。",
                   )}
                   {button("全ての単語を復習する", () => startStudy(false))}
                 </>
               ))}
             {screen === "studyResult" && (
               <>
-                {heading(
-                  "NICE WORK",
+                {completion(
+                  "✓",
+                  "CHAPTER COMPLETE",
                   "ひと区切り、完了。",
-                  `${queue.length}語を確認しました。少しずつ、確かな力に。`,
+                  `${queue.length}語を確認しました。\n少しずつ、確かな力に。`,
                 )}
                 {button("もう一度学習する", () => startStudy(onlyUnmastered))}
                 {button("レベルのメニューに戻る", () => go("mode"), true)}
@@ -514,64 +997,87 @@ function LearningApp() {
             {screen === "quiz" &&
               (question ? (
                 <>
-                  <View style={s.row}>
-                    {text(
-                      `QUIZ ${index + 1} / ${questions.length}`,
-                      12,
+                  <View style={s.sectionHeader}>
+                    {eyebrow(
+                      `QUICK QUIZ / ${String(index + 1).padStart(2, "0")}`,
                       c.accent,
                     )}
-                    {text(`正解 ${correct}`, 14, c.muted)}
+                    {text(`正解 ${correct} / ${questions.length}`, 12, c.muted)}
                   </View>
                   {meter(index, questions.length)}
                   {wordCard(question.word, selected !== null)}
-                  {question.choices.map((choice, i) => {
-                    const isCorrect =
-                      selected !== null && i === question.correctIndex;
-                    const isWrong = selected === i && !isCorrect;
-                    return (
-                      <Pressable
-                        key={i}
-                        accessibilityRole="button"
-                        accessibilityState={{ disabled: selected !== null }}
-                        disabled={selected !== null}
-                        onPress={() => answer(i)}
-                        style={[
-                          s.choice,
-                          {
-                            backgroundColor: isCorrect ? c.soft : c.card,
-                            borderColor: isWrong
-                              ? "#BA5E42"
-                              : isCorrect
-                                ? c.accent
-                                : c.line,
-                          },
-                        ]}
-                      >
-                        {text(
-                          `${isCorrect ? "✓" : isWrong ? "×" : String.fromCharCode(65 + i)}   ${choice}`,
-                          17,
-                          isWrong ? (dark ? "#FFA487" : "#9A4329") : c.ink,
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                  {selected !== null && (
-                    <>
-                      {text(
-                        selected === question.correctIndex
-                          ? "正解です！"
-                          : "「まだ」に追加しました。あとで復習しましょう。",
-                        14,
-                        c.accent,
-                      )}
-                      {button(
-                        index + 1 === questions.length
-                          ? "結果を見る"
-                          : "次の問題 →",
-                        nextQuestion,
-                      )}
-                    </>
-                  )}
+                  <View style={{ gap: 10 }}>
+                    {question.choices.map((choice, i) => {
+                      const isCorrect =
+                        selected !== null && i === question.correctIndex;
+                      const isWrong = selected === i && !isCorrect;
+                      return (
+                        <Pressable
+                          key={i}
+                          accessibilityRole="button"
+                          accessibilityState={{ disabled: selected !== null }}
+                          disabled={selected !== null}
+                          onPress={() => answer(i)}
+                          style={({ pressed }) => [
+                            s.choice,
+                            {
+                              backgroundColor: isCorrect
+                                ? c.soft
+                                : pressed
+                                  ? c.soft
+                                  : c.card,
+                              borderColor: isWrong
+                                ? "#B66B54"
+                                : isCorrect
+                                  ? c.accent
+                                  : c.line,
+                            },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              s.choiceLetter,
+                              {
+                                backgroundColor: isCorrect ? c.accent : c.soft,
+                              },
+                            ]}
+                          >
+                            {text(
+                              isCorrect
+                                ? "✓"
+                                : isWrong
+                                  ? "×"
+                                  : String.fromCharCode(65 + i),
+                              13,
+                              isCorrect ? c.bg : c.accent,
+                            )}
+                          </View>
+                          <Text
+                            style={{
+                              color: isWrong
+                                ? dark
+                                  ? "#FFC0A9"
+                                  : "#97472F"
+                                : c.ink,
+                              fontSize: 16,
+                              lineHeight: 24,
+                              flex: 1,
+                            }}
+                          >
+                            {choice}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {selected !== null &&
+                    text(
+                      selected === question.correctIndex
+                        ? "正解です！"
+                        : "未習得に戻しました。あとで復習しましょう。",
+                      14,
+                      c.accent,
+                    )}
                 </>
               ) : (
                 <>
@@ -581,7 +1087,8 @@ function LearningApp() {
               ))}
             {screen === "result" && (
               <>
-                {heading(
+                {completion(
+                  correct === questions.length ? "✦" : "✓",
                   "QUIZ COMPLETE",
                   `${correct} / ${questions.length}`,
                   correct === questions.length
@@ -590,29 +1097,33 @@ function LearningApp() {
                 )}
                 {wrong.length > 0 && (
                   <>
-                    {text("復習する単語", 20)}
+                    <View style={s.sectionHeader}>
+                      <Text
+                        style={{
+                          color: c.ink,
+                          fontSize: 19,
+                          fontWeight: "600",
+                        }}
+                      >
+                        もう一度、出会う言葉。
+                      </Text>
+                      {eyebrow(`${wrong.length} WORDS`)}
+                    </View>
                     {wrong.map((w) => (
                       <View
                         key={w.No}
                         style={[
-                          s.level,
-                          { backgroundColor: c.card, borderColor: c.line },
+                          s.review,
+                          { borderColor: c.line, backgroundColor: c.card },
                         ]}
                       >
                         <View style={s.row}>
-                          <Text style={[s.brand, { color: c.ink, flex: 1 }]}>
+                          <Text style={[s.reviewWord, { color: c.ink }]}>
                             {w.word}
                           </Text>
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel={`${w.word}の発音を聞く`}
-                            onPress={() => speak(w.word)}
-                            style={s.back}
-                          >
-                            {text("発音", 14, c.accent)}
-                          </Pressable>
+                          {audioButton(w.word, `${w.word}の発音を聞く`)}
                         </View>
-                        {text(w.meaning, 16, c.muted)}
+                        {text(w.meaning, 14, c.muted)}
                       </View>
                     ))}
                   </>
@@ -624,82 +1135,248 @@ function LearningApp() {
           </Animated.View>
         )}
       </ScrollView>
+      {screen === "quiz" && selected !== null && (
+        <View
+          style={[
+            s.quizFooter,
+            { borderTopColor: c.line, backgroundColor: c.bg },
+          ]}
+        >
+          {button(
+            index + 1 === questions.length ? "結果を見る" : "次の問題",
+            nextQuestion,
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
+const serif = Platform.select({
+  ios: "Georgia",
+  android: "serif",
+  default: "Georgia, 'Times New Roman', serif",
+});
 const s = StyleSheet.create({
   header: {
-    minHeight: 64,
-    paddingHorizontal: 22,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
+    minHeight: 72,
+    width: "100%",
+    alignSelf: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
   },
-  brand: { fontSize: 18, fontWeight: "700" },
-  back: { minHeight: 44, minWidth: 48, justifyContent: "center" },
+  brand: {
+    fontFamily: serif,
+    fontSize: 27,
+    letterSpacing: -1.2,
+    fontWeight: "600",
+  },
+  brandMark: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    flexDirection: "row",
+    gap: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  back: {
+    minHeight: 44,
+    minWidth: 80,
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
   content: {
     width: "100%",
-    maxWidth: 600,
     alignSelf: "center",
-    padding: 22,
-    paddingBottom: 44,
+    padding: 24,
+    paddingBottom: 40,
   },
-  heading: { gap: 12, paddingVertical: 18 },
-  studyTapArea: {
-    flexGrow: 1,
-    minHeight: 120,
-    marginTop: -18,
-    marginHorizontal: -22,
-    paddingTop: 34,
-    paddingBottom: 24,
-    paddingHorizontal: 22,
-    alignItems: "center",
-    justifyContent: "flex-end",
+  eyebrow: {
+    fontSize: 10,
+    lineHeight: 16,
+    letterSpacing: 1.4,
+    fontWeight: "600",
   },
+  heading: { gap: 12, paddingTop: 22, paddingBottom: 12 },
   hero: {
-    fontSize: 34,
-    lineHeight: 46,
-    fontWeight: "700",
+    fontSize: 30,
+    lineHeight: 42,
+    fontWeight: "600",
     letterSpacing: -0.8,
   },
+  homeHero: { paddingTop: 20, paddingBottom: 12 },
+  editorialTitle: { fontFamily: serif, letterSpacing: -3.4 },
+  artwork: { height: 280, borderRadius: 20, overflow: "hidden" },
+  orbit: {
+    position: "absolute",
+    borderWidth: 1,
+    borderRadius: 150,
+    opacity: 0.45,
+  },
+  artLetter: { fontFamily: serif, position: "absolute", letterSpacing: -8 },
+  artBadge: {
+    position: "absolute",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3 },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
   },
-  summary: { borderRadius: 20, padding: 22, gap: 16 },
-  stat: { fontSize: 30, fontWeight: "700" },
-  track: { height: 5, borderRadius: 5, overflow: "hidden" },
-  level: { borderWidth: 1, borderRadius: 20, padding: 20, gap: 10 },
-  levelNumber: { fontSize: 28, fontWeight: "700" },
-  card: { borderWidth: 1, borderRadius: 26, padding: 24, gap: 20 },
-  word: {
-    fontSize: 40,
-    lineHeight: 52,
-    fontWeight: "700",
-    textAlign: "center",
-    marginVertical: 28,
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
   },
-  meaning: { borderTopWidth: 1, paddingTop: 24, gap: 16 },
-  meaningText: { fontSize: 24, fontWeight: "600" },
-  button: {
-    minHeight: 54,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+  summary: { borderRadius: 20, padding: 24, gap: 18 },
+  stat: {
+    fontFamily: serif,
+    fontSize: 48,
+    lineHeight: 54,
+    letterSpacing: -1.8,
+  },
+  progressBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  buttonText: { fontSize: 16, fontWeight: "700", textAlign: "center" },
-  choice: {
-    minHeight: 60,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1.5,
+  track: { height: 3, borderRadius: 3, overflow: "hidden" },
+  level: { borderBottomWidth: 1, paddingVertical: 23, paddingHorizontal: 2 },
+  levelNumber: {
+    fontFamily: serif,
+    fontSize: 37,
+    lineHeight: 44,
+    letterSpacing: -1.4,
+  },
+  levelArrow: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: "center",
     justifyContent: "center",
   },
+  scoreTitle: {
+    fontFamily: serif,
+    fontSize: 92,
+    lineHeight: 100,
+    letterSpacing: -5,
+  },
+  modeCard: { borderWidth: 1, borderRadius: 22, padding: 24, gap: 20 },
+  modeGlyph: { fontFamily: serif, fontSize: 34, fontStyle: "italic" },
+  modeTitle: {
+    fontSize: 25,
+    lineHeight: 35,
+    fontWeight: "600",
+    letterSpacing: -0.6,
+  },
+  button: {
+    minHeight: 56,
+    borderRadius: 28,
+    paddingVertical: 15,
+    paddingHorizontal: 21,
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  buttonText: {
+    flexShrink: 1,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
+  wordCard: { borderWidth: 1, borderRadius: 24, padding: 24 },
+  mastery: {
+    minHeight: 44,
+    paddingHorizontal: 15,
+    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 22,
+  },
+  wordRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  tappable: { flexGrow: 1, flexShrink: 1, paddingVertical: 6 },
+  word: { fontFamily: serif, letterSpacing: -1.5, lineHeight: 64 },
+  audio: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  meaning: { borderTopWidth: 1, paddingTop: 22, gap: 8 },
+  meaningText: { fontSize: 22, fontWeight: "600", lineHeight: 34 },
+  example: { fontFamily: serif, fontSize: 20, lineHeight: 30 },
+  studyTapArea: {
+    flexGrow: 1,
+    minHeight: 116,
+    marginTop: -20,
+    marginHorizontal: -24,
+    paddingTop: 32,
+    paddingBottom: 28,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  tapHint: {
+    borderTopWidth: 1,
+    width: "100%",
+    maxWidth: 280,
+    paddingTop: 18,
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quizFooter: {
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderTopWidth: 1,
+  },
+  choice: {
+    minHeight: 66,
+    borderRadius: 17,
+    padding: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  choiceLetter: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  completionSeal: {
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sealText: { fontFamily: serif, fontSize: 48 },
+  review: { borderWidth: 1, borderRadius: 18, padding: 20, gap: 8 },
+  reviewWord: { fontFamily: serif, fontSize: 26, flex: 1 },
   notice: { borderRadius: 16, padding: 18, gap: 12, marginBottom: 16 },
 });
