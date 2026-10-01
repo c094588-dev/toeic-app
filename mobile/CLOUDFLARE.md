@@ -10,7 +10,7 @@ Workers & Pagesからアプリケーションを作成し、GitHubリポジト�
 | --- | --- |
 | リポジトリ | c094588-dev/toeic-app |
 | 本番ブランチ | codex/react-native-expo |
-| Worker名 | toeic-word-note |
+| Worker名 | toeic-app |
 | ルートディレクトリ | mobile |
 | ビルドコマンド | npm run build:web |
 | デプロイコマンド | npx wrangler@4 deploy |
