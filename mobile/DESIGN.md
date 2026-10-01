@@ -2,7 +2,7 @@
 
 ## Direction
 
-A quiet editorial vocabulary notebook: paper tones, ink green, serif English typography and lime accents. The overlapping `a / あ` circles express the connection between English and Japanese. Native views create the artwork and speaker icons; no images, font downloads or new runtime dependencies are required.
+A quiet editorial vocabulary notebook: paper tones, ink green, serif English typography and lime accents. Home starts with the collection panel beneath the logo, followed directly by the level list. Native views create the speaker icons; no images, font downloads or new runtime dependencies are required.
 
 The same type hierarchy, spacing, colors and controls apply to home, level selection, flashcards, quiz and results. Home adapts at 760px. Learning content stays at a readable maximum width. Light and dark appearances follow the device setting.
 
