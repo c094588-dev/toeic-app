@@ -5,6 +5,14 @@ enum StudyMode {
     case unmasteredOnly // 覚えていないものだけ
 }
 
+/// 4択クイズの1問
+struct QuizQuestion: Identifiable {
+    let word: Word
+    let choices: [String]   // 意味の選択肢（4つ）
+    let correctIndex: Int
+    var id: Int { word.id }
+}
+
 class WordStore: ObservableObject {
     @Published var allWords: [Word] = []
     @Published var selectedScoreBand: Int? = nil
@@ -122,6 +130,32 @@ class WordStore: ObservableObject {
             }
         }
         return arr
+    }
+
+    // MARK: - Quiz
+
+    /// 指定レベルから4択クイズを作る。覚えていない単語を優先して出題する
+    func makeQuiz(band: Int, count: Int = 10) -> [QuizQuestion] {
+        let bandWords = allWords.filter { $0.scoreBand == band }
+        let unmastered = bandWords.filter { !masteredIds.contains($0.id) }.shuffled()
+        let mastered   = bandWords.filter {  masteredIds.contains($0.id) }.shuffled()
+        let targets = Array((unmastered + mastered).prefix(count)).shuffled()
+
+        return targets.compactMap { word in
+            // 正解と同じ意味の単語は選択肢から除外し、意味の重複もなくす
+            var distractors: [String] = []
+            for candidate in bandWords.shuffled() where candidate.meaning != word.meaning {
+                if !distractors.contains(candidate.meaning) {
+                    distractors.append(candidate.meaning)
+                }
+                if distractors.count == 3 { break }
+            }
+            guard distractors.count == 3 else { return nil }
+
+            let choices = (distractors + [word.meaning]).shuffled()
+            guard let correctIndex = choices.firstIndex(of: word.meaning) else { return nil }
+            return QuizQuestion(word: word, choices: choices, correctIndex: correctIndex)
+        }
     }
 
     // MARK: - Mark

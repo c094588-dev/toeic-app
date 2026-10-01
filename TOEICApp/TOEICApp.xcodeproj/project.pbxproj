@@ -14,6 +14,7 @@
 		B4F5F1F890BEB4C7F3AAF999 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E770BC6AF499F0567D5E621C /* ContentView.swift */; };
 		EEE48A41A44A03CA1736D4A1 /* Word.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D3D2868B78BED02BE4C0D9 /* Word.swift */; };
 		FEB6D2302D4B6E758DA3BF4F /* FlashCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3F8869158451A0E54B388E7 /* FlashCardView.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* QuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4B3A291807F6E5D4C3B2A1 /* QuizView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 		65F6B2A26A8725859881EA95 /* WordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordStore.swift; sourceTree = "<group>"; };
 		B3D958D91EA18534BAE654AF /* words.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = words.json; sourceTree = "<group>"; };
 		C3F8869158451A0E54B388E7 /* FlashCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashCardView.swift; sourceTree = "<group>"; };
+		5C4B3A291807F6E5D4C3B2A1 /* QuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizView.swift; sourceTree = "<group>"; };
 		D613D7FAD9DF6EC5FE09D5E6 /* TOEICAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TOEICAppApp.swift; sourceTree = "<group>"; };
 		E770BC6AF499F0567D5E621C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -44,6 +46,7 @@
 				458E9DC15650AE688C66FCF9 /* Assets.xcassets */,
 				E770BC6AF499F0567D5E621C /* ContentView.swift */,
 				C3F8869158451A0E54B388E7 /* FlashCardView.swift */,
+				5C4B3A291807F6E5D4C3B2A1 /* QuizView.swift */,
 				D613D7FAD9DF6EC5FE09D5E6 /* TOEICAppApp.swift */,
 				19D3D2868B78BED02BE4C0D9 /* Word.swift */,
 				B3D958D91EA18534BAE654AF /* words.json */,
@@ -128,6 +131,7 @@
 			files = (
 				B4F5F1F890BEB4C7F3AAF999 /* ContentView.swift in Sources */,
 				FEB6D2302D4B6E758DA3BF4F /* FlashCardView.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* QuizView.swift in Sources */,
 				AB69967D905EF36765098422 /* TOEICAppApp.swift in Sources */,
 				EEE48A41A44A03CA1736D4A1 /* Word.swift in Sources */,
 				6B56876E9F944523F9397ED7 /* WordStore.swift in Sources */,

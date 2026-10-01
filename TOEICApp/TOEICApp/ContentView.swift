@@ -4,9 +4,14 @@ struct ContentView: View {
     @StateObject private var store = WordStore()
     @State private var selectedLevel: Int? = nil
     @State private var selectedMode: StudyMode? = nil
+    @State private var isQuiz = false
 
     var body: some View {
-        if let level = selectedLevel, let mode = selectedMode {
+        if let level = selectedLevel, isQuiz {
+            QuizView(store: store, level: level) {
+                isQuiz = false
+            }
+        } else if let level = selectedLevel, selectedMode != nil {
             StudyView(store: store, level: level) {
                 selectedLevel = nil
                 selectedMode = nil
@@ -15,6 +20,8 @@ struct ContentView: View {
             ModeSelectView(store: store, level: level) { mode in
                 store.buildStudyQueue(band: level, mode: mode)
                 selectedMode = mode
+            } onQuiz: {
+                isQuiz = true
             } onBack: {
                 selectedLevel = nil
             }
@@ -120,6 +127,7 @@ struct ModeSelectView: View {
     @ObservedObject var store: WordStore
     let level: Int
     let onSelect: (StudyMode) -> Void
+    let onQuiz: () -> Void
     let onBack: () -> Void
 
     var body: some View {
@@ -183,6 +191,34 @@ struct ModeSelectView: View {
                         }
                         .padding(.vertical, 6)
                     }
+                } header: {
+                    Text("フラッシュカード")
+                }
+
+                Section {
+                    Button(action: onQuiz) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "checklist")
+                                .font(.title2)
+                                .foregroundColor(.orange)
+                                .frame(width: 40)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("4択クイズ（10問）")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Text("覚えていない単語から優先して出題・間違えたら「まだ」に")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 6)
+                    }
+                } header: {
+                    Text("テスト")
                 }
             }
             .listStyle(.insetGrouped)
