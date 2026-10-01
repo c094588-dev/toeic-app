@@ -9,7 +9,7 @@ Workers & Pagesからアプリケーションを作成し、GitHubリポジト�
 | 項目 | 設定値 |
 | --- | --- |
 | リポジトリ | c094588-dev/toeic-app |
-| 本番ブランチ | codex/react-native-expo |
+| 本番ブランチ | main |
 | Worker名 | toeic-app |
 | ルートディレクトリ | mobile |
 | ビルドコマンド | npm run build:web |
@@ -17,7 +17,7 @@ Workers & Pagesからアプリケーションを作成し、GitHubリポジト�
 
 依存関係はmobile/package-lock.jsonからインストールされます。Worker名はwrangler.jsoncのnameと一致させます。アカウントはCloudflareの画面で選択し、認証情報をリポジトリに書き込まないでください。
 
-公開が成功するとCloudflareに表示されるworkers.devのURLを共有できます。現在のmainブランチにはこのモバイル版がないため、必ず上記のブランチを選択してください。このブランチへの更新は公開サイトへ自動反映されます。
+公開が成功するとCloudflareに表示されるworkers.devのURLを共有できます。mainブランチへの更新は公開サイトへ自動反映されます。
 
 ## 確認事項
 

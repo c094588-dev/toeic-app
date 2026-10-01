@@ -1,13 +1,13 @@
 # TOEIC 単語ノート / React Native + Expo
 
-既存の `claude/busy-gates-pwhg2v` (d2b27e3) を基にした、iOS・Android共通の初期実装です。旧Swift版とWeb版は残しています。
+iOS・Android・Web共通のTOEIC単語アプリです。旧Swift版（`TOEICApp/`）とWeb版（`index.html`）もリポジトリに残しています。
 
 ## 起動
 
 Node.js 24 LTSを使用します。リポジトリ全体を取得してください（親ディレクトリのwords.jsonを共有）。
 
 ```sh
-git switch codex/react-native-expo
+git switch main
 cd mobile
 npm ci
 npm start
