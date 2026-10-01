@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "TOEIC 単語ノート",
+    "slug": "toeic-word-note",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": { "supportsTablet": true },
+    "android": {},
+    "web": { "bundler": "metro" }
+  }
+}
