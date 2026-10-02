@@ -18,6 +18,7 @@ import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
 import data from "../words.json";
 import { makeQuiz, studyWords, type Word, type Question } from "./src/learning";
+import { clozeExample } from "./src/cloze";
 import { useProgress } from "./src/useProgress";
 const words: Word[] = data;
 const validIds = new Set(words.map((w) => w.No));
@@ -412,6 +413,18 @@ function LearningApp() {
           )}
           {!reverse && audioButton(w.word, `${w.word}の発音を聞く`)}
         </View>
+        {reverse && !showMeaning && (
+          <View style={[s.meaning, { borderTopColor: c.line }]}>
+            {eyebrow("IN CONTEXT", c.accent)}
+            <View style={s.wordRow}>
+              {tappable(
+                <Text style={[s.example, { color: c.ink }]}>
+                  {clozeExample(w.word, w.example)}
+                </Text>,
+              )}
+            </View>
+          </View>
+        )}
         {showMeaning && (
           <Animated.View
             style={[
