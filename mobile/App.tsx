@@ -88,6 +88,8 @@ function LearningApp() {
   const [queue, setQueue] = useState<Word[]>([]);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  const [reverseCards, setReverseCards] = useState(false);
+  const revealHint = reverseCards ? "タップして英単語を表示" : "タップして意味を表示";
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
@@ -352,7 +354,8 @@ function LearningApp() {
       54,
       Math.max(22, (Math.min(width, 640) - 154) / (w.word.length * 0.48)),
     );
-    const tapHint = showMeaning ? "タップして次へ" : "タップして意味を表示";
+    const reverse = studying && reverseCards;
+    const tapHint = showMeaning ? "タップして次へ" : revealHint;
     function tappable(content: React.ReactNode) {
       return studying ? (
         <Pressable
@@ -398,15 +401,16 @@ function LearningApp() {
                 s.word,
                 {
                   color: c.ink,
-                  fontSize: wordSize,
-                  lineHeight: wordSize * 1.25,
+                  fontSize: reverse ? 28 : wordSize,
+                  lineHeight: reverse ? 42 : wordSize * 1.25,
+                  ...(reverse ? { fontFamily: undefined, letterSpacing: 0 } : {}),
                 },
               ]}
             >
-              {w.word}
+              {reverse ? w.meaning : w.word}
             </Text>,
           )}
-          {audioButton(w.word, `${w.word}の発音を聞く`)}
+          {!reverse && audioButton(w.word, `${w.word}の発音を聞く`)}
         </View>
         {showMeaning && (
           <Animated.View
@@ -415,10 +419,21 @@ function LearningApp() {
               { borderTopColor: c.line, opacity: studying ? revealFade : 1 },
             ]}
           >
-            {tappable(
-              <Text style={[s.meaningText, { color: c.ink }]}>
-                {w.meaning}
-              </Text>,
+            {reverse ? (
+              <View style={s.wordRow}>
+                {tappable(
+                  <Text style={[s.word, { color: c.ink, fontSize: wordSize, lineHeight: wordSize * 1.25 }]}>
+                    {w.word}
+                  </Text>,
+                )}
+                {audioButton(w.word, `${w.word}の発音を聞く`)}
+              </View>
+            ) : (
+              tappable(
+                <Text style={[s.meaningText, { color: c.ink }]}>
+                  {w.meaning}
+                </Text>,
+              )
             )}
             <View style={{ gap: 8, marginTop: 12 }}>
               {eyebrow("IN CONTEXT", c.accent)}
@@ -770,10 +785,29 @@ function LearningApp() {
                       言葉に、出会う。
                     </Text>
                     {text(
-                      "単語をめくって、意味と例文を自分のものに。",
+                      reverseCards ? "意味から英単語を思い出して、タップで答え合わせ。" : "単語をめくって、意味と例文を自分のものに。",
                       13,
                       c.muted,
                     )}
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {([false, true] as const).map((reverse) => (
+                      <Pressable
+                        key={String(reverse)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: reverseCards === reverse }}
+                        onPress={() => setReverseCards(reverse)}
+                        style={({ pressed }) => ({
+                          flex: 1, alignItems: "center", justifyContent: "center",
+                          minHeight: 48, padding: 10, borderRadius: 12, borderWidth: 1,
+                          borderColor: reverseCards === reverse ? c.accent : c.line,
+                          backgroundColor: reverseCards === reverse ? c.soft : c.card,
+                          opacity: pressed ? 0.65 : 1,
+                        })}
+                      >
+                        {text(reverse ? "日本語 → 英単語" : "英単語 → 日本語", 13, reverseCards === reverse ? c.accent : c.muted)}
+                      </Pressable>
+                    ))}
                   </View>
                   {button("未習得の単語を学ぶ", () => startStudy(true))}
                   {button("全ての単語を復習", () => startStudy(false), true)}
@@ -815,7 +849,7 @@ function LearningApp() {
               (word ? (
                 <>
                   <View style={s.sectionHeader}>
-                    {eyebrow("FLASHCARDS", c.accent)}
+                    {eyebrow(reverseCards ? "JA → EN / FLASHCARDS" : "EN → JA / FLASHCARDS", c.accent)}
                     <Text style={{ color: c.muted, fontSize: 13 }}>
                       <Text style={{ color: c.ink, fontWeight: "600" }}>
                         {String(index + 1).padStart(2, "0")}
@@ -828,7 +862,7 @@ function LearningApp() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={
-                      revealed ? "タップして次へ" : "タップして意味を表示"
+                      revealed ? "タップして次へ" : revealHint
                     }
                     onPress={() =>
                       revealed ? advanceCard() : setRevealed(true)
@@ -841,7 +875,7 @@ function LearningApp() {
                         style={[s.dot, { backgroundColor: c.accent }]}
                       />
                       {text(
-                        revealed ? "タップして次へ" : "タップして意味を表示",
+                        revealed ? "タップして次へ" : revealHint,
                         12,
                         c.muted,
                       )}
