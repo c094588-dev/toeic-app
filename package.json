@@ -1,0 +1,8 @@
+{
+  "name": "toeic-app",
+  "private": true,
+  "description": "Cloudflare Workers Builds をリポジトリ直下から実行するための入口。アプリ本体は mobile/",
+  "scripts": {
+    "build:web": "npm --prefix mobile ci && npm --prefix mobile run build:web"
+  }
+}
