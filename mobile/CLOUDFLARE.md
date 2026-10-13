@@ -36,4 +36,8 @@ npm run build:web
 npx wrangler@4 deploy --dry-run
 ```
 
+## うまくいかないとき
+
+ビルドログに `Could not read package.json: ... /opt/buildhome/repo/package.json` と出る場合は、ルートディレクトリが空（リポジトリ直下）になっています。Settings → Build のルートディレクトリを `mobile` にしてください。本番ブランチを切り替えたときなどに設定が外れることがあります。
+
 参考: https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
