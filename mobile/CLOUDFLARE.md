@@ -40,4 +40,8 @@ npx wrangler@4 deploy --dry-run
 
 ルートディレクトリはどちらの設定でもビルドできます。空の場合はリポジトリ直下の `package.json`（`mobile/` で `npm ci` とビルドを実行）と `wrangler.jsonc`（`mobile/dist` を配信）が使われ、`mobile` の場合は `mobile/` 内の同名ファイルが使われます。2つの `wrangler.jsonc` は内容（Worker名など）をそろえてください。
 
+本番ブランチ（main）以外のブランチやPRでは、Cloudflareが `npx wrangler preview` でプレビューを作成します。このコマンドは `wrangler.jsonc` に `"previews": {}` がないと「missing a `previews` block」で失敗するため、2つの `wrangler.jsonc` の両方に入れています。削除しないでください。
+
+本番ブランチの設定を変えた直後は、すでに始まっていたビルドがプレビュー扱いのまま終わることがあります。ビルド履歴のURLが `.../production/previews/main/...` になっていたら本番へは公開されていないので、もう一度ビルドしてください。
+
 参考: https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
