@@ -1,0 +1,12 @@
+// Cloudflare のルートディレクトリが空（リポジトリ直下）でもデプロイできるようにするための設定。
+// ルートディレクトリを mobile にした場合は mobile/wrangler.jsonc が使われる。両方の内容をそろえておくこと。
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "toeic-app",
+  "compatibility_date": "2026-09-28",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./mobile/dist",
+    "not_found_handling": "single-page-application"
+  }
+}

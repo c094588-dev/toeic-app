@@ -11,7 +11,7 @@ Workers & Pagesからアプリケーションを作成し、GitHubリポジト�
 | リポジトリ | c094588-dev/toeic-app |
 | 本番ブランチ | main |
 | Worker名 | toeic-app |
-| ルートディレクトリ | mobile |
+| ルートディレクトリ | 空（リポジトリ直下）または mobile |
 | ビルドコマンド | npm run build:web |
 | デプロイコマンド | npx wrangler@4 deploy |
 
@@ -38,6 +38,6 @@ npx wrangler@4 deploy --dry-run
 
 ## うまくいかないとき
 
-ビルドログに `Could not read package.json: ... /opt/buildhome/repo/package.json` と出る場合は、ルートディレクトリが空（リポジトリ直下）になっています。Settings → Build のルートディレクトリを `mobile` にしてください。本番ブランチを切り替えたときなどに設定が外れることがあります。
+ルートディレクトリはどちらの設定でもビルドできます。空の場合はリポジトリ直下の `package.json`（`mobile/` で `npm ci` とビルドを実行）と `wrangler.jsonc`（`mobile/dist` を配信）が使われ、`mobile` の場合は `mobile/` 内の同名ファイルが使われます。2つの `wrangler.jsonc` は内容（Worker名など）をそろえてください。
 
 参考: https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
