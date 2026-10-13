@@ -8,5 +8,7 @@
   "assets": {
     "directory": "./mobile/dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  // 本番以外のブランチのビルドで使う `wrangler preview` に必要（中身は空でよい）
+  "previews": {}
 }
