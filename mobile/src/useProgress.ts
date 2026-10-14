@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { emptyProgress, mark, restoreProgress, type Progress } from "./learning";
+import {
+  emptyProgress,
+  mark,
+  markQuizCorrect,
+  restoreProgress,
+  type Progress,
+} from "./learning";
 const KEY = "toeic.progress.v1";
 // 読み込めなかった保存データの退避先（上書きで失わないように残す）
 const BACKUP_KEY = "toeic.progress.v1.corrupt";
@@ -41,7 +47,7 @@ export function useProgress(validIds: Set<number>) {
       try {
         await AsyncStorage.setItem(
           KEY,
-          JSON.stringify({ version: 1, ...value }),
+          JSON.stringify({ version: 2, ...value }),
         );
         setError("");
       } catch {
@@ -51,12 +57,19 @@ export function useProgress(validIds: Set<number>) {
       }
     });
   }
-  function record(id: number, mastered: boolean) {
-    if (!ready) return;
-    const next = mark(current.current, id, mastered);
+  function update(next: Progress) {
     current.current = next;
     setProgress(next);
     save(next);
+  }
+  function record(id: number, mastered: boolean) {
+    if (!ready) return;
+    update(mark(current.current, id, mastered));
+  }
+  /** クイズで正解したとき（苦手度を下げる） */
+  function recordQuizCorrect(id: number) {
+    if (!ready) return;
+    update(markQuizCorrect(current.current, id));
   }
   return {
     progress,
@@ -65,6 +78,7 @@ export function useProgress(validIds: Set<number>) {
     notice,
     dismissNotice: () => setNotice(""),
     record,
+    recordQuizCorrect,
     retry: () => (ready ? save(current.current) : void load()),
   };
 }
