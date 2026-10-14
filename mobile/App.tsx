@@ -16,7 +16,14 @@ import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import data from "../words.json";
-import { makeQuiz, studyWords, type Word, type Question } from "./src/learning";
+import {
+  isWeak,
+  makeQuiz,
+  studyWords,
+  type Question,
+  type StudyMode,
+  type Word,
+} from "./src/learning";
 import { clozeExample } from "./src/cloze";
 import { useProgress } from "./src/useProgress";
 const words: Word[] = data;
@@ -74,8 +81,24 @@ function LearningApp() {
     const available = Math.min(screenWidth, 600) - 44 - 48;
     return Math.max(22, Math.min(40, Math.floor(available / (longest * 0.64))));
   }
-  const { progress, ready, error, notice, dismissNotice, record, retry } =
-    useProgress(validIds);
+  const {
+    progress,
+    ready,
+    error,
+    notice,
+    dismissNotice,
+    record,
+    recordQuizCorrect,
+    retry,
+  } = useProgress(validIds);
+  // レベルごとの苦手な単語の数
+  const weakByBand = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const w of words)
+      if (isWeak(progress, w.No))
+        counts.set(w.score_band, (counts.get(w.score_band) ?? 0) + 1);
+    return counts;
+  }, [progress]);
   // レベルごとの習得数（配列の includes を毎回回さないよう Set で集計）
   const masteredByBand = useMemo(() => {
     const masteredSet = new Set(progress.mastered);
@@ -112,7 +135,7 @@ function LearningApp() {
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
   const [wrong, setWrong] = useState<Word[]>([]);
-  const [onlyUnmastered, setOnlyUnmastered] = useState(true);
+  const [studyMode, setStudyMode] = useState<StudyMode>("unmastered");
   const answerLock = useRef(false);
   const fade = useRef(new Animated.Value(1)).current;
   const scroll = useRef<ScrollView>(null);
@@ -120,6 +143,7 @@ function LearningApp() {
   const question = questions[index];
   const total = words.filter((w) => w.score_band === band).length;
   const mastered = masteredByBand.get(band) ?? 0;
+  const weak = weakByBand.get(band) ?? 0;
   const title = screen === "home" ? "TOEIC 単語ノート" : `TOEIC ${band}点`;
   function go(next: Screen) {
     void Speech.stop();
@@ -152,16 +176,21 @@ function LearningApp() {
     [],
   );
   function speak(text: string) {
+    speakAll([text]);
+  }
+  /** 続けて読み上げる（単語 → 例文など）。前の読み上げは止める */
+  function speakAll(texts: string[]) {
     void Speech.stop();
-    Speech.speak(text, { language: "en-US", rate: 0.88, onError: () => {} });
+    for (const t of texts)
+      Speech.speak(t, { language: "en-US", rate: 0.88, onError: () => {} });
   }
   // 自動発音はタップの処理の中で呼ぶ（スマホのブラウザは操作直後でないと音を出せないため）
   function autoSpeakWord(value: string | undefined) {
     if (autoSpeak && value) speak(value);
   }
-  function startStudy(unmastered: boolean) {
-    const next = studyWords(words, band, progress, unmastered);
-    setOnlyUnmastered(unmastered);
+  function startStudy(mode: StudyMode) {
+    const next = studyWords(words, band, progress, mode);
+    setStudyMode(mode);
     setQueue(next);
     setIndex(0);
     setRevealed(false);
@@ -180,11 +209,15 @@ function LearningApp() {
     go("quiz");
     autoSpeakWord(next[0]?.word.word);
   }
-  /** カードの答えを表示。逆向きカードでは、ここで初めて英単語が出るので発音する */
+  /**
+   * カードの答えを表示し、出てきた例文を自動で読み上げる。
+   * 逆向きカードでは、ここで初めて英単語が出るので「単語 → 例文」の順に読む
+   */
   function reveal() {
     if (!word || revealed) return;
     setRevealed(true);
-    if (reverseCards) autoSpeakWord(word.word);
+    if (autoSpeak)
+      speakAll(reverseCards ? [word.word, word.example] : [word.example]);
   }
   function studyTap() {
     if (revealed) advanceCard();
@@ -213,6 +246,7 @@ function LearningApp() {
     setSelected(choice);
     if (choice === question.correctIndex) {
       setCorrect((n) => n + 1);
+      recordQuizCorrect(question.word.No);
       void Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success,
       ).catch(() => {});
@@ -382,6 +416,11 @@ function LearningApp() {
     );
     return (
       <View style={[s.card, { backgroundColor: c.card, borderColor: c.line }]}>
+        {studying && isWeak(progress, w.No) && (
+          <View style={[s.weakBadge, { borderColor: c.wrongBorder }]}>
+            <Text style={[s.weakBadgeText, { color: c.wrong }]}>苦手な単語</Text>
+          </View>
+        )}
         {cardContent}
       </View>
     );
@@ -561,7 +600,11 @@ function LearningApp() {
                       </View>
                       {text(labels[i], 16, c.muted)}
                       {meter(m, n)}
-                      {text(`${m} / ${n} 語を習得`, 14, c.muted)}
+                      <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
+                        {text(`${m} / ${n} 語を習得`, 14, c.muted)}
+                        {(weakByBand.get(b) ?? 0) > 0 &&
+                          text(`苦手 ${weakByBand.get(b)}語`, 14, c.wrong)}
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -573,7 +616,7 @@ function LearningApp() {
                 {heading(
                   "学習メニュー",
                   `${band}点への、一歩。`,
-                  `${total}語のうち、${mastered}語を習得済み。`,
+                  `${total}語のうち、${mastered}語を習得済み。${weak > 0 ? `苦手な単語は${weak}語。` : ""}`,
                 )}
                 <View
                   style={[
@@ -585,7 +628,7 @@ function LearningApp() {
                   {text(
                     reverseCards
                       ? "日本語の意味から英単語を思い出して、答え合わせ。"
-                      : "意味を思い出してから、答え合わせ。",
+                      : "意味を思い出してから、答え合わせ。苦手な単語から先に出します。",
                     16,
                     c.muted,
                   )}
@@ -624,11 +667,13 @@ function LearningApp() {
                     })}
                   </View>
                   {button(`覚えていない単語（${total - mastered}語）`, () =>
-                    startStudy(true),
+                    startStudy("unmastered"),
                   )}
+                  {weak > 0 &&
+                    button(`苦手な単語だけ（${weak}語）`, () => startStudy("weak"), true)}
                   {button(
                     `全ての単語（${total}語）`,
-                    () => startStudy(false),
+                    () => startStudy("all"),
                     true,
                   )}
                 </View>
@@ -640,7 +685,7 @@ function LearningApp() {
                 >
                   {text("確かめる", 24)}
                   {text(
-                    "4択・10問。未習得の単語を優先して出題します。",
+                    "4択・10問。苦手な単語を優先して出題します。",
                     16,
                     c.muted,
                   )}
@@ -674,7 +719,7 @@ function LearningApp() {
                     "このレベルは習得済み！",
                     "全ての単語でおさらいすることもできます。",
                   )}
-                  {button("全ての単語を復習する", () => startStudy(false))}
+                  {button("全ての単語を復習する", () => startStudy("all"))}
                 </>
               ))}
             {screen === "studyResult" && (
@@ -684,7 +729,7 @@ function LearningApp() {
                   "ひと区切り、完了。",
                   `${queue.length}語を確認しました。少しずつ、確かな力に。`,
                 )}
-                {button("もう一度学習する", () => startStudy(onlyUnmastered))}
+                {button("もう一度学習する", () => startStudy(studyMode))}
                 {button("レベルのメニューに戻る", () => go("mode"), true)}
               </>
             )}
@@ -857,6 +902,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
   toggleText: { fontSize: 15, lineHeight: 20, textAlign: "center" },
+  weakBadge: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    marginBottom: -8,
+  },
+  weakBadgeText: { fontSize: 14, lineHeight: 20, fontWeight: "600" },
   studyArea: { flexGrow: 1, gap: 18, paddingBottom: 44 },
   pill: {
     minHeight: 44,

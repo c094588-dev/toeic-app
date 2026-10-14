@@ -1,7 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { makeQuiz, mark, parseProgress, restoreProgress, studyWords } from "../src/learning.ts";
+import {
+  isWeak,
+  makeQuiz,
+  mark,
+  markQuizCorrect,
+  parseProgress,
+  restoreProgress,
+  studyWords,
+} from "../src/learning.ts";
 const words = JSON.parse(
   readFileSync(new URL("../../words.json", import.meta.url)),
 );
@@ -39,18 +47,22 @@ test("未習得が十分なら習得済みをクイズに出さない", () => {
   );
 });
 test("誤答で習得を取り消し、再習得でまだを削除する", () => {
-  const missed = mark({ mastered: [1], notYet: [] }, 1, false);
-  assert.deepEqual(missed, { mastered: [], notYet: [1] });
-  assert.deepEqual(mark(missed, 1, true), { mastered: [1], notYet: [] });
+  const missed = mark({ mastered: [1], notYet: [] }, 1, false, 1000);
+  assert.deepEqual(missed, { mastered: [], notYet: [1], stats: { 1: { miss: 1, seen: 1000 } } });
+  assert.deepEqual(mark(missed, 1, true, 2000), {
+    mastered: [1],
+    notYet: [],
+    stats: { 1: { miss: 0, seen: 2000 } },
+  });
 });
 test("全習得後は空キュー、空の進捗はそのまま復元する", () => {
   assert.equal(
-    studyWords(words, 500, { mastered: [...ids], notYet: [] }, true).length,
+    studyWords(words, 500, { mastered: [...ids], notYet: [] }, "unmastered").length,
     0,
   );
   assert.deepEqual(
     parseProgress('{"version":1,"mastered":[],"notYet":[]}', ids),
-    { mastered: [], notYet: [] },
+    { mastered: [], notYet: [], stats: {} },
   );
 });
 test("壊れた保存形式を黙って上書きしない・不明IDを除外する", () => {
@@ -58,7 +70,7 @@ test("壊れた保存形式を黙って上書きしない・不明IDを除外す
   assert.throws(() => parseProgress("broken", ids));
   assert.deepEqual(
     parseProgress('{"version":1,"mastered":[1,1,99999],"notYet":[1,2]}', ids),
-    { mastered: [1], notYet: [2] },
+    { mastered: [1], notYet: [2], stats: {} },
   );
 });
 test("教材が空でもクイズ生成は停止しない", () =>
@@ -73,16 +85,102 @@ test("全例文に日本語訳があり、英語の例文も保持されてい�
 
 test("壊れた保存データは空の進捗で再開し、corrupt で知らせる", () => {
   assert.deepEqual(restoreProgress("broken", ids), {
-    progress: { mastered: [], notYet: [] },
+    progress: { mastered: [], notYet: [], stats: {} },
     corrupt: true,
   });
   assert.deepEqual(restoreProgress("{}", ids).corrupt, true);
   assert.deepEqual(restoreProgress(null, ids), {
-    progress: { mastered: [], notYet: [] },
+    progress: { mastered: [], notYet: [], stats: {} },
     corrupt: false,
   });
   assert.deepEqual(
     restoreProgress('{"version":1,"mastered":[1],"notYet":[2]}', ids),
-    { progress: { mastered: [1], notYet: [2] }, corrupt: false },
+    { progress: { mastered: [1], notYet: [2], stats: {} }, corrupt: false },
   );
+});
+
+// ---- 苦手な単語を優先する ----
+const DAY = 24 * 60 * 60 * 1000;
+const NOW = 100 * DAY;
+const band500 = words.filter((w) => w.score_band === 500).map((w) => w.No);
+
+test("苦手度: まだ・誤答で上がり、クイズ正解で下がり、覚えたで0に戻る", () => {
+  let p = mark({ mastered: [], notYet: [] }, 1, false, NOW);
+  p = mark(p, 1, false, NOW);
+  assert.equal(p.stats[1].miss, 2);
+  p = markQuizCorrect(p, 1, NOW);
+  assert.equal(p.stats[1].miss, 1);
+  assert.deepEqual(p.notYet, [1]);
+  assert.equal(isWeak(p, 1), true);
+  p = markQuizCorrect(p, 1, NOW);
+  assert.equal(isWeak(p, 1), false);
+  assert.equal(mark(p, 1, true, NOW).stats[1].miss, 0);
+});
+
+test("以前の保存形式(version 1)の「まだ」は苦手な単語として扱う", () => {
+  const p = parseProgress('{"version":1,"mastered":[],"notYet":[5]}', ids);
+  assert.equal(isWeak(p, 5), true);
+});
+
+test("壊れた単語記録は読み込まない", () => {
+  const p = parseProgress(
+    '{"version":2,"mastered":[],"notYet":[],"stats":{"1":{"miss":2,"seen":5},"2":{"miss":-1,"seen":5},"3":{"miss":"x","seen":5},"99999":{"miss":1,"seen":1}}}',
+    ids,
+  );
+  assert.deepEqual(p.stats, { 1: { miss: 2, seen: 5 } });
+});
+
+test("覚えていない単語: 苦手な単語が先、苦手度が高いほど先、その後に新しい単語", () => {
+  const [a, b, c] = band500;
+  const p = {
+    mastered: [],
+    notYet: [a, b],
+    stats: { [a]: { miss: 1, seen: NOW }, [b]: { miss: 4, seen: NOW } },
+  };
+  const order = studyWords(words, 500, p, "unmastered", NOW).map((w) => w.No);
+  assert.deepEqual(order.slice(0, 2), [b, a]);
+  assert.equal(order.length, 500);
+  assert.ok(order.includes(c));
+});
+
+test("同じ苦手度なら、最後に見てから日が経った単語が先", () => {
+  const [a, b] = band500;
+  const p = {
+    mastered: [],
+    notYet: [a, b],
+    stats: { [a]: { miss: 2, seen: NOW }, [b]: { miss: 2, seen: NOW - 10 * DAY } },
+  };
+  for (let i = 0; i < 20; i++)
+    assert.deepEqual(studyWords(words, 500, p, "weak", NOW).map((w) => w.No), [b, a]);
+});
+
+test("全ての単語: 覚えた単語は後ろ。久しぶりの覚えた単語は最近の覚えた単語より先", () => {
+  const [a, b] = band500;
+  const p = {
+    mastered: [a, b],
+    notYet: [],
+    stats: { [a]: { miss: 0, seen: NOW }, [b]: { miss: 0, seen: NOW - 20 * DAY } },
+  };
+  const order = studyWords(words, 500, p, "all", NOW).map((w) => w.No);
+  assert.deepEqual(order.slice(-2), [b, a]);
+});
+
+test("苦手な単語だけ: 苦手な単語のみ出る", () => {
+  const [a, b, c] = band500;
+  const p = { mastered: [c], notYet: [a, b], stats: { [a]: { miss: 1, seen: NOW }, [b]: { miss: 0, seen: NOW } } };
+  assert.deepEqual(studyWords(words, 500, p, "weak", NOW).map((w) => w.No), [a]);
+});
+
+test("クイズ: 苦手な単語が10語以上あれば、10問すべて苦手な単語から出す", () => {
+  const weak = band500.slice(100, 115);
+  const p = {
+    mastered: [],
+    notYet: weak,
+    stats: Object.fromEntries(weak.map((id) => [id, { miss: 1, seen: NOW }])),
+  };
+  for (let run = 0; run < 20; run++) {
+    const quiz = makeQuiz(words, 500, p, 10, NOW);
+    assert.equal(quiz.length, 10);
+    assert.ok(quiz.every((q) => weak.includes(q.word.No)));
+  }
 });
