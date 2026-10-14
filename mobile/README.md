@@ -2,6 +2,11 @@
 
 iOS・Android・Web共通のTOEIC単語アプリです。旧Swift版（`TOEICApp/`）とWeb版（`index.html`）もリポジトリに残しています。
 
+## 公開URL
+
+- 本番（`main`）: https://toeic-app.trainer-jonny.workers.dev
+- `main` 以外のブランチは `https://<ブランチ名>-toeic-app.trainer-jonny.workers.dev` にプレビューが作られます（公開設定は [CLOUDFLARE.md](CLOUDFLARE.md)）。
+
 ## 起動
 
 Node.js 24 LTSを使用します。リポジトリ全体を取得してください（親ディレクトリのwords.jsonを共有）。
