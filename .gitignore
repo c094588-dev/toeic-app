@@ -11,15 +11,8 @@ DerivedData/
 # macOS
 .DS_Store
 
-# Swift Package Manager
-.build/
-.swiftpm/
-
 # CocoaPods
 Pods/
-
-# Carthage
-Carthage/Build/
 
 # Claude Code (個人設定)
 .claude/settings.local.json

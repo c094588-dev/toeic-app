@@ -1,6 +1,6 @@
 # TOEIC 単語ノート / React Native + Expo
 
-iOS・Android・Web共通のTOEIC単語アプリです。旧Swift版（`TOEICApp/`）とWeb版（`index.html`）もリポジトリに残しています。
+iOS・Android・Web共通のTOEIC単語アプリです。以前のSwift版とWeb版（`index.html`）は削除しました（gitの履歴には残っています）。
 
 ## 公開URL
 
@@ -45,7 +45,7 @@ npx expo export --platform all
 
 ## 移行・公開前の残作業
 
-- 既存Swift版のiCloud進捗、Web版localStorage進捗の自動移行は未実装。新アプリの保存領域は独立しています。
+- 以前のSwift版（iCloud）・Web版（localStorage）の学習記録は引き継いでいません。新アプリの保存領域は独立しています。
 - iPhone／Androidの実機で音声・振動・大きい文字設定・オフライン再起動を確認する。
 - ストア用の正式なアプリ名、アイコン、Bundle ID／Android packageを確定する。
 - 開発者アカウント、署名、プライバシーポリシー、教材の利用権等を確認して公開準備を行う。
