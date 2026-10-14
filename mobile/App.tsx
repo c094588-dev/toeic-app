@@ -176,8 +176,13 @@ function LearningApp() {
     [],
   );
   function speak(text: string) {
+    speakAll([text]);
+  }
+  /** 続けて読み上げる（単語 → 例文など）。前の読み上げは止める */
+  function speakAll(texts: string[]) {
     void Speech.stop();
-    Speech.speak(text, { language: "en-US", rate: 0.88, onError: () => {} });
+    for (const t of texts)
+      Speech.speak(t, { language: "en-US", rate: 0.88, onError: () => {} });
   }
   // 自動発音はタップの処理の中で呼ぶ（スマホのブラウザは操作直後でないと音を出せないため）
   function autoSpeakWord(value: string | undefined) {
@@ -204,11 +209,15 @@ function LearningApp() {
     go("quiz");
     autoSpeakWord(next[0]?.word.word);
   }
-  /** カードの答えを表示。逆向きカードでは、ここで初めて英単語が出るので発音する */
+  /**
+   * カードの答えを表示し、出てきた例文を自動で読み上げる。
+   * 逆向きカードでは、ここで初めて英単語が出るので「単語 → 例文」の順に読む
+   */
   function reveal() {
     if (!word || revealed) return;
     setRevealed(true);
-    if (reverseCards) autoSpeakWord(word.word);
+    if (autoSpeak)
+      speakAll(reverseCards ? [word.word, word.example] : [word.example]);
   }
   function studyTap() {
     if (revealed) advanceCard();
