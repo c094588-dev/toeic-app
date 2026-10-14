@@ -16,6 +16,7 @@ import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
 import data from "../words.json";
 import { makeQuiz, studyWords, type Word, type Question } from "./src/learning";
+import { clozeExample } from "./src/cloze";
 import { useProgress } from "./src/useProgress";
 const words: Word[] = data;
 const validIds = new Set(words.map((w) => w.No));
@@ -87,6 +88,8 @@ function LearningApp() {
   const [queue, setQueue] = useState<Word[]>([]);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  // true: 日本語の意味から英単語を思い出す（逆向きカード）
+  const [reverseCards, setReverseCards] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
@@ -287,23 +290,41 @@ function LearningApp() {
       );
     }
     const size = wordFontSize(w.word);
+    const reverse = studying && reverseCards;
+    const englishWord = (
+      <View style={{ alignItems: "center", gap: 12 }}>
+        {tappable(
+          <Text
+            selectable={!studying}
+            numberOfLines={w.word.includes(" ") ? 2 : 1}
+            style={[s.word, { color: c.ink, fontSize: size, lineHeight: Math.round(size * 1.3) }]}
+          >
+            {w.word}
+          </Text>
+        )}
+        {audioButton(w.word, `${w.word}の発音を聞く`)}
+      </View>
+    );
     const cardContent = (
       <>
-        <View style={{ alignItems: "center", gap: 12 }}>
-          {tappable(
-            <Text
-              selectable={!studying}
-              numberOfLines={w.word.includes(" ") ? 2 : 1}
-              style={[s.word, { color: c.ink, fontSize: size, lineHeight: Math.round(size * 1.3) }]}
-            >
-              {w.word}
-            </Text>
-          )}
-          {audioButton(w.word, `${w.word}の発音を聞く`)}
-        </View>
+        {reverse
+          ? tappable(
+              <Text style={[s.meaningText, s.reversePrompt, { color: c.ink }]}>
+                {w.meaning}
+              </Text>,
+            )
+          : englishWord}
+        {reverse && !showMeaning && (
+          <View style={[s.meaning, { borderTopColor: c.line }]}>
+            {text("例文（空欄に入る英単語は？）", 14, c.accent)}
+            {tappable(text(clozeExample(w.word, w.example), 17, c.ink))}
+          </View>
+        )}
         {showMeaning && (
           <View style={[s.meaning, { borderTopColor: c.line }]}>
-            {tappable(<Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>)}
+            {reverse
+              ? englishWord
+              : tappable(<Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>)}
             <View style={{ gap: 8 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                 {tappable(text(w.example, 17, c.ink))}
@@ -316,7 +337,11 @@ function LearningApp() {
         {studying &&
           tappable(
             <Text style={[s.hint, { color: c.muted }]}>
-              {showMeaning ? "カードをタップすると、記録せずに次へ" : "カードをタップして意味を表示"}
+              {showMeaning
+                ? "カードをタップすると、記録せずに次へ"
+                : reverse
+                  ? "カードをタップして英単語を表示"
+                  : "カードをタップして意味を表示"}
             </Text>,
           )}
       </>
@@ -475,7 +500,47 @@ function LearningApp() {
                   ]}
                 >
                   {text("覚える", 24)}
-                  {text("意味を思い出してから、答え合わせ。", 16, c.muted)}
+                  {text(
+                    reverseCards
+                      ? "日本語の意味から英単語を思い出して、答え合わせ。"
+                      : "意味を思い出してから、答え合わせ。",
+                    16,
+                    c.muted,
+                  )}
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {([false, true] as const).map((rev) => {
+                      const on = reverseCards === rev;
+                      return (
+                        <Pressable
+                          key={String(rev)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          accessibilityLabel={rev ? "日本語から英単語を答える" : "英単語から日本語を答える"}
+                          onPress={() => setReverseCards(rev)}
+                          style={({ pressed }) => [
+                            s.toggle,
+                            {
+                              borderColor: on ? c.accent : c.border,
+                              backgroundColor: on ? c.accent : c.card,
+                              opacity: pressed ? 0.7 : 1,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              s.toggleText,
+                              {
+                                color: on ? (dark ? "#102A28" : "#FFFFFF") : c.ink,
+                                fontWeight: on ? "700" : "500",
+                              },
+                            ]}
+                          >
+                            {rev ? "日本語 → 英語" : "英語 → 日本語"}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                   {button(`覚えていない単語（${total - mastered}語）`, () =>
                     startStudy(true),
                   )}
@@ -506,7 +571,11 @@ function LearningApp() {
               (word ? (
                 <>
                   <View style={s.row}>
-                    {text("フラッシュカード", 14, c.accent)}
+                    {text(
+                      reverseCards ? "フラッシュカード（日本語 → 英単語）" : "フラッシュカード",
+                      14,
+                      c.accent,
+                    )}
                     {text(`${index + 1} / ${queue.length}`, 16, c.muted)}
                   </View>
                   {meter(index, queue.length)}
@@ -690,6 +759,17 @@ const s = StyleSheet.create({
     letterSpacing: -0.6,
   },
   heroCompact: { fontSize: 22, lineHeight: 30, letterSpacing: -0.3 },
+  reversePrompt: { fontSize: 26, lineHeight: 38, textAlign: "center", marginTop: 20 },
+  toggle: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  toggleText: { fontSize: 15, lineHeight: 20, textAlign: "center" },
   hint: { fontSize: 15, lineHeight: 22, textAlign: "center", paddingTop: 4 },
   footer: { borderTopWidth: 1, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 16 },
   footerInner: { width: "100%", maxWidth: 556, alignSelf: "center", gap: 10 },
