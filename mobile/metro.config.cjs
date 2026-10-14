@@ -1,6 +1,6 @@
 const path = require("node:path");
 const { getDefaultConfig } = require("expo/metro-config");
 const config = getDefaultConfig(__dirname);
-// Share the canonical vocabulary with the existing web and Swift apps.
+// Read the canonical vocabulary (../words.json) from the repository root.
 config.watchFolders = [path.resolve(__dirname, "..")];
 module.exports = config;
