@@ -14,12 +14,14 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import data from "../words.json";
 import { makeQuiz, studyWords, type Word, type Question } from "./src/learning";
 import { clozeExample } from "./src/cloze";
 import { useProgress } from "./src/useProgress";
 const words: Word[] = data;
 const validIds = new Set(words.map((w) => w.No));
+const SETTINGS_KEY = "toeic.settings.v1";
 const bands = [500, 600, 700, 800, 900];
 const labels = [
   "基礎を、確かな力に。",
@@ -90,6 +92,22 @@ function LearningApp() {
   const [revealed, setRevealed] = useState(false);
   // true: 日本語の意味から英単語を思い出す（逆向きカード）
   const [reverseCards, setReverseCards] = useState(false);
+  // 単語が表示されたら自動で発音する（イヤホン利用を想定して既定はオン）
+  const [autoSpeak, setAutoSpeak] = useState(true);
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY)
+      .then((raw) => {
+        const saved = raw ? JSON.parse(raw) : null;
+        if (typeof saved?.autoSpeak === "boolean") setAutoSpeak(saved.autoSpeak);
+      })
+      .catch(() => {});
+  }, []);
+  function toggleAutoSpeak() {
+    const next = !autoSpeak;
+    setAutoSpeak(next);
+    if (!next) void Speech.stop();
+    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({ autoSpeak: next })).catch(() => {});
+  }
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
@@ -137,22 +155,40 @@ function LearningApp() {
     void Speech.stop();
     Speech.speak(text, { language: "en-US", rate: 0.88, onError: () => {} });
   }
+  // 自動発音はタップの処理の中で呼ぶ（スマホのブラウザは操作直後でないと音を出せないため）
+  function autoSpeakWord(value: string | undefined) {
+    if (autoSpeak && value) speak(value);
+  }
   function startStudy(unmastered: boolean) {
+    const next = studyWords(words, band, progress, unmastered);
     setOnlyUnmastered(unmastered);
-    setQueue(studyWords(words, band, progress, unmastered));
+    setQueue(next);
     setIndex(0);
     setRevealed(false);
     answerLock.current = false;
     go("study");
+    if (!reverseCards) autoSpeakWord(next[0]?.word);
   }
   function startQuiz() {
-    setQuestions(makeQuiz(words, band, progress));
+    const next = makeQuiz(words, band, progress);
+    setQuestions(next);
     setIndex(0);
     setSelected(null);
     setCorrect(0);
     setWrong([]);
     answerLock.current = false;
     go("quiz");
+    autoSpeakWord(next[0]?.word.word);
+  }
+  /** カードの答えを表示。逆向きカードでは、ここで初めて英単語が出るので発音する */
+  function reveal() {
+    if (!word || revealed) return;
+    setRevealed(true);
+    if (reverseCards) autoSpeakWord(word.word);
+  }
+  function studyTap() {
+    if (revealed) advanceCard();
+    else reveal();
   }
   /** 次のカードへ。markAs を指定すると「覚えた」(true) /「まだ」(false) を記録する */
   function advanceCard(markAs?: boolean) {
@@ -163,7 +199,10 @@ function LearningApp() {
     void Speech.stop();
     setRevealed(false);
     if (index + 1 >= queue.length) go("studyResult");
-    else setIndex(index + 1);
+    else {
+      setIndex(index + 1);
+      if (!reverseCards) autoSpeakWord(queue[index + 1]?.word);
+    }
   }
   useEffect(() => {
     answerLock.current = false;
@@ -187,7 +226,10 @@ function LearningApp() {
     void Speech.stop();
     setSelected(null);
     if (index + 1 >= questions.length) go("result");
-    else setIndex(index + 1);
+    else {
+      setIndex(index + 1);
+      autoSpeakWord(questions[index + 1]?.word.word);
+    }
   }
   const text = (value: string, size = 16, color = c.ink) => (
     <Text style={{ color, fontSize: size, lineHeight: size * 1.5 }}>
@@ -254,18 +296,9 @@ function LearningApp() {
   }
   function wordCard(w: Word, showMeaning: boolean) {
     const studying = screen === "study";
-    const tapHint = showMeaning ? "タップして次へ" : "タップして意味を表示";
+    // 学習中のタップは画面全体で受けるので、カード内は表示だけ
     function tappable(content: React.ReactNode) {
-      return studying ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityHint={tapHint}
-          onPress={() => showMeaning ? advanceCard() : setRevealed(true)}
-          style={{ flexGrow: 1, flexShrink: 1, paddingVertical: 8 }}
-        >
-          {content}
-        </Pressable>
-      ) : <View style={{ flexGrow: 1, flexShrink: 1 }}>{content}</View>;
+      return <View style={{ flexGrow: 1, flexShrink: 1 }}>{content}</View>;
     }
     function audioButton(value: string, label: string) {
       return (
@@ -302,7 +335,7 @@ function LearningApp() {
             {w.word}
           </Text>
         )}
-        {audioButton(w.word, `${w.word}の発音を聞く`)}
+        {!studying && audioButton(w.word, `${w.word}の発音を聞く`)}
       </View>
     );
     const cardContent = (
@@ -334,16 +367,17 @@ function LearningApp() {
             </View>
           </View>
         )}
-        {studying &&
-          tappable(
+        {studying && (
+          <Pressable accessibilityRole="button" onPress={studyTap}>
             <Text style={[s.hint, { color: c.muted }]}>
               {showMeaning
-                ? "カードをタップすると、記録せずに次へ"
+                ? "画面をタップすると、記録せずに次へ"
                 : reverse
-                  ? "カードをタップして英単語を表示"
-                  : "カードをタップして意味を表示"}
-            </Text>,
-          )}
+                  ? "画面のどこかをタップして英単語を表示"
+                  : "画面のどこかをタップして意味を表示"}
+            </Text>
+          </Pressable>
+        )}
       </>
     );
     return (
@@ -358,6 +392,49 @@ function LearningApp() {
       <View style={[s.footer, { backgroundColor: c.bg, borderTopColor: c.line }]}>
         <View style={s.footerInner}>{content}</View>
       </View>
+    );
+  }
+  function autoSpeakToggle() {
+    return (
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: autoSpeak }}
+        accessibilityLabel="単語を自動で発音"
+        onPress={toggleAutoSpeak}
+        style={({ pressed }) => [
+          s.pill,
+          {
+            borderColor: autoSpeak ? c.accent : c.border,
+            backgroundColor: autoSpeak ? c.soft : c.card,
+            opacity: pressed ? 0.7 : 1,
+          },
+        ]}
+      >
+        <Text style={[s.pillText, { color: autoSpeak ? c.accent : c.muted }]}>
+          {autoSpeak ? "🔊 自動発音 オン" : "🔇 自動発音 オフ"}
+        </Text>
+      </Pressable>
+    );
+  }
+  function footerAudioButton(value: string, disabled: boolean) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="発音を聞く"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={() => speak(value)}
+        style={({ pressed }) => [
+          s.footerAudio,
+          {
+            backgroundColor: c.soft,
+            borderColor: c.border,
+            opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
+          },
+        ]}
+      >
+        <Text accessible={false} style={{ fontSize: 26 }}>🔊</Text>
+      </Pressable>
     );
   }
   function markButton(label: string, a11yLabel: string, value: boolean) {
@@ -408,7 +485,10 @@ function LearningApp() {
       </View>
       <ScrollView
         ref={scroll}
-        contentContainerStyle={s.content}
+        contentContainerStyle={[
+          s.content,
+          screen === "study" && word && { flexGrow: 1, paddingBottom: 0 },
+        ]}
       >
         {!!notice && (
           <View style={[s.notice, { backgroundColor: c.soft }]}>
@@ -430,7 +510,9 @@ function LearningApp() {
             )}
           </View>
         ) : (
-          <Animated.View style={{ opacity: fade, gap: 18 }}>
+          <Animated.View
+            style={{ opacity: fade, gap: 18, flexGrow: screen === "study" && word ? 1 : 0 }}
+          >
             {screen === "home" && (
               <>
                 {heading(
@@ -569,18 +651,22 @@ function LearningApp() {
             )}
             {screen === "study" &&
               (word ? (
-                <>
+                // 画面のどこをタップしても答えの表示・次へ進める（片手・親指で操作しやすく）
+                <Pressable accessible={false} onPress={studyTap} style={s.studyArea}>
                   <View style={s.row}>
-                    {text(
-                      reverseCards ? "フラッシュカード（日本語 → 英単語）" : "フラッシュカード",
-                      14,
-                      c.accent,
-                    )}
-                    {text(`${index + 1} / ${queue.length}`, 16, c.muted)}
+                    <View style={{ flexShrink: 1 }}>
+                      {text(
+                        reverseCards ? "フラッシュカード（日本語 → 英語）" : "フラッシュカード",
+                        14,
+                        c.accent,
+                      )}
+                      {text(`${index + 1} / ${queue.length}`, 16, c.muted)}
+                    </View>
+                    {autoSpeakToggle()}
                   </View>
                   {meter(index, queue.length)}
                   {wordCard(word, revealed)}
-                </>
+                </Pressable>
               ) : (
                 <>
                   {heading(
@@ -606,12 +692,11 @@ function LearningApp() {
               (question ? (
                 <>
                   <View style={s.row}>
-                    {text(
-                      `4択クイズ ${index + 1} / ${questions.length}問`,
-                      14,
-                      c.accent,
-                    )}
-                    {text(`正解 ${correct}`, 16, c.muted)}
+                    <View style={{ flexShrink: 1 }}>
+                      {text(`4択クイズ ${index + 1} / ${questions.length}問`, 14, c.accent)}
+                      {text(`正解 ${correct}`, 16, c.muted)}
+                    </View>
+                    {autoSpeakToggle()}
                   </View>
                   {meter(index, questions.length)}
                   {wordCard(question.word, selected !== null)}
@@ -702,7 +787,9 @@ function LearningApp() {
         screen === "study" &&
         word &&
         footer(
-          <View style={{ flexDirection: "row", gap: 12 }}>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {/* 逆向きカードでは、答えを出す前に発音すると答えが分かってしまうので押せなくする */}
+            {footerAudioButton(word.word, reverseCards && !revealed)}
             {markButton("まだ", "まだとして保存して次へ", false)}
             {markButton("覚えた ✓", "覚えたとして保存して次へ", true)}
           </View>,
@@ -770,6 +857,25 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
   toggleText: { fontSize: 15, lineHeight: 20, textAlign: "center" },
+  studyArea: { flexGrow: 1, gap: 18, paddingBottom: 44 },
+  pill: {
+    minHeight: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  pillText: { fontSize: 14, lineHeight: 20, fontWeight: "600" },
+  footerAudio: {
+    width: 56,
+    minHeight: 56,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   hint: { fontSize: 15, lineHeight: 22, textAlign: "center", paddingTop: 4 },
   footer: { borderTopWidth: 1, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 16 },
   footerInner: { width: "100%", maxWidth: 556, alignSelf: "center", gap: 10 },
