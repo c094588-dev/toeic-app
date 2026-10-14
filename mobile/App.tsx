@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -43,18 +44,33 @@ function LearningApp() {
         ink: "#F2F6F5",
         muted: "#A8BABD",
         line: "#34454C",
+        border: "#667C83",
+        track: "#3E5158",
         accent: "#80DACC",
         soft: "#243E3F",
+        wrong: "#FFA487",
+        wrongBorder: "#E0876B",
       }
     : {
         bg: "#F5F6F2",
         card: "#FFFFFF",
         ink: "#172F36",
-        muted: "#62777B",
+        muted: "#55696D",
         line: "#E0E7E4",
+        border: "#7C8C87",
+        track: "#D3DCD8",
         accent: "#176F66",
         soft: "#E7F2EE",
+        wrong: "#9A4329",
+        wrongBorder: "#A9502F",
       };
+  // 英単語は1行に収まる大きさにする（長い単語が途中で折り返されないように）
+  const { width: screenWidth } = useWindowDimensions();
+  function wordFontSize(value: string) {
+    const longest = Math.max(...value.split(/\s+/).map((t) => t.length), 1);
+    const available = Math.min(screenWidth, 600) - 44 - 48;
+    return Math.max(22, Math.min(40, Math.floor(available / (longest * 0.64))));
+  }
   const { progress, ready, error, notice, dismissNotice, record, retry } =
     useProgress(validIds);
   // レベルごとの習得数（配列の includes を毎回回さないよう Set で集計）
@@ -83,7 +99,7 @@ function LearningApp() {
   const question = questions[index];
   const total = words.filter((w) => w.score_band === band).length;
   const mastered = masteredByBand.get(band) ?? 0;
-  const title = screen === "home" ? "単語ノート" : `TOEIC ${band}`;
+  const title = screen === "home" ? "TOEIC 単語ノート" : `TOEIC ${band}点`;
   function go(next: Screen) {
     void Speech.stop();
     setScreen(next);
@@ -211,7 +227,7 @@ function LearningApp() {
       <View
         accessibilityRole="progressbar"
         accessibilityValue={{ min: 0, max, now: value }}
-        style={[s.track, { backgroundColor: c.line }]}
+        style={[s.track, { backgroundColor: c.track }]}
       >
         <View
           style={{
@@ -224,12 +240,12 @@ function LearningApp() {
       </View>
     );
   }
-  function heading(kicker: string, main: string, subtitle: string) {
+  function heading(kicker: string, main: string, subtitle: string, compact = false) {
     return (
-      <View style={s.heading}>
-        {text(kicker, 12, c.accent)}
-        <Text style={[s.hero, { color: c.ink }]}>{main}</Text>
-        {text(subtitle, 14, c.muted)}
+      <View style={[s.heading, compact && { paddingVertical: 4, gap: 8 }]}>
+        {!!kicker && text(kicker, 14, c.accent)}
+        <Text style={[s.hero, compact && s.heroCompact, { color: c.ink }]}>{main}</Text>
+        {text(subtitle, 16, c.muted)}
       </View>
     );
   }
@@ -270,33 +286,16 @@ function LearningApp() {
         </Pressable>
       );
     }
-    function markButton(label: string, a11yLabel: string, value: boolean) {
-      const color = value ? c.accent : dark ? "#FFA487" : "#9A4329";
-      return (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={a11yLabel}
-          onPress={() => advanceCard(value)}
-          style={({ pressed }) => ({
-            minHeight: 44,
-            paddingHorizontal: 16,
-            justifyContent: "center",
-            borderRadius: 22,
-            backgroundColor: value ? c.soft : c.card,
-            borderWidth: value ? 0 : 1,
-            borderColor: c.line,
-            opacity: pressed ? 0.65 : 1,
-          })}
-        >
-          {text(label, 14, color)}
-        </Pressable>
-      );
-    }
+    const size = wordFontSize(w.word);
     const cardContent = (
       <>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <View style={{ alignItems: "center", gap: 12 }}>
           {tappable(
-            <Text selectable={!studying} style={[s.word, { color: c.ink }]}>
+            <Text
+              selectable={!studying}
+              numberOfLines={w.word.includes(" ") ? 2 : 1}
+              style={[s.word, { color: c.ink, fontSize: size, lineHeight: Math.round(size * 1.3) }]}
+            >
               {w.word}
             </Text>
           )}
@@ -305,30 +304,61 @@ function LearningApp() {
         {showMeaning && (
           <View style={[s.meaning, { borderTopColor: c.line }]}>
             {tappable(<Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>)}
-            <View style={{ gap: 6 }}>
+            <View style={{ gap: 8 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                {tappable(text(w.example, 16, c.muted))}
+                {tappable(text(w.example, 17, c.ink))}
                 {audioButton(w.example, "英語の例文を聞く")}
               </View>
-              {tappable(text(w.example_ja, 14, c.muted))}
+              {tappable(text(w.example_ja, 16, c.muted))}
             </View>
           </View>
         )}
+        {studying &&
+          tappable(
+            <Text style={[s.hint, { color: c.muted }]}>
+              {showMeaning ? "カードをタップすると、記録せずに次へ" : "カードをタップして意味を表示"}
+            </Text>,
+          )}
       </>
     );
     return (
       <View style={[s.card, { backgroundColor: c.card, borderColor: c.line }]}>
-        <View style={s.row}>
-          {text(`${w.score_band} LEVEL`, 12, c.accent)}
-          {studying && (
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {markButton("まだ", "まだとして保存して次へ", false)}
-              {markButton("覚えた ✓", "覚えたとして保存して次へ", true)}
-            </View>
-          )}
-        </View>
         {cardContent}
       </View>
+    );
+  }
+  /** 画面下に固定するボタン欄（親指が届きやすい位置に主な操作を置く） */
+  function footer(content: React.ReactNode) {
+    return (
+      <View style={[s.footer, { backgroundColor: c.bg, borderTopColor: c.line }]}>
+        <View style={s.footerInner}>{content}</View>
+      </View>
+    );
+  }
+  function markButton(label: string, a11yLabel: string, value: boolean) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={a11yLabel}
+        onPress={() => advanceCard(value)}
+        style={({ pressed }) => [
+          s.markButton,
+          {
+            backgroundColor: value ? c.accent : c.card,
+            borderColor: value ? c.accent : c.wrongBorder,
+            opacity: pressed ? 0.75 : 1,
+          },
+        ]}
+      >
+        <Text
+          style={[
+            s.buttonText,
+            { color: value ? (dark ? "#102A28" : "#FFFFFF") : c.wrong },
+          ]}
+        >
+          {label}
+        </Text>
+      </Pressable>
     );
   }
   return (
@@ -345,26 +375,25 @@ function LearningApp() {
             {text("‹ 戻る", 16, c.accent)}
           </Pressable>
         ) : (
-          text("WORD / NOTE", 12, c.accent)
+          <Text style={[s.brand, { color: c.ink }]}>{title}</Text>
         )}
-        <Text style={[s.brand, { color: c.ink }]}>{title}</Text>
+        {screen !== "home" && (
+          <Text style={[s.brand, { color: c.ink }]}>{title}</Text>
+        )}
       </View>
       <ScrollView
         ref={scroll}
-        contentContainerStyle={[
-          s.content,
-          screen === "study" && word && { flexGrow: 1, paddingBottom: 0 },
-        ]}
+        contentContainerStyle={s.content}
       >
         {!!notice && (
           <View style={[s.notice, { backgroundColor: c.soft }]}>
-            {text(notice, 14)}
+            {text(notice, 16)}
             {button("閉じる", dismissNotice, true)}
           </View>
         )}
         {!!error && (
           <View style={[s.notice, { backgroundColor: c.soft }]}>
-            {text(error, 14)}
+            {text(error, 16)}
             {button("再試行", retry, true)}
           </View>
         )}
@@ -376,20 +405,21 @@ function LearningApp() {
             )}
           </View>
         ) : (
-          <Animated.View style={{ opacity: fade, gap: 18, flexGrow: screen === "study" && word ? 1 : 0 }}>
+          <Animated.View style={{ opacity: fade, gap: 18 }}>
             {screen === "home" && (
               <>
                 {heading(
-                  "小さな積み重ね、大きな一歩。",
+                  "",
                   "今日のひとことが、\n明日の自信に。",
-                  "1,500語から、あなたの目標に合うレベルを。",
+                  "目標に合うレベルを選んでください。",
+                  true,
                 )}
                 <View style={[s.summary, { backgroundColor: c.soft }]}>
                   <View style={s.row}>
-                    {text("覚えた単語", 14, c.muted)}
+                    {text("覚えた単語", 16, c.ink)}
                     <Text style={[s.stat, { color: c.accent }]}>
                       {progress.mastered.length}
-                      <Text style={{ fontSize: 14 }}> / 1,500</Text>
+                      <Text style={{ fontSize: 16 }}> / 1,500</Text>
                     </Text>
                   </View>
                   {meter(progress.mastered.length, 1500)}
@@ -410,7 +440,7 @@ function LearningApp() {
                         s.level,
                         {
                           backgroundColor: c.card,
-                          borderColor: c.line,
+                          borderColor: c.border,
                           opacity: pressed ? 0.7 : 1,
                         },
                       ]}
@@ -418,23 +448,23 @@ function LearningApp() {
                       <View style={s.row}>
                         <Text style={[s.levelNumber, { color: c.ink }]}>
                           {b}
-                          <Text style={{ fontSize: 14 }}> 点レベル</Text>
+                          <Text style={{ fontSize: 16 }}> 点レベル</Text>
                         </Text>
                         {text("→", 24, c.accent)}
                       </View>
-                      {text(labels[i], 14, c.muted)}
+                      {text(labels[i], 16, c.muted)}
                       {meter(m, n)}
-                      {text(`${m} / ${n} 語を習得`, 12, c.muted)}
+                      {text(`${m} / ${n} 語を習得`, 14, c.muted)}
                     </Pressable>
                   );
                 })}
-                {text("進捗はこの端末に保存されます。", 12, c.muted)}
+                {text("進捗はこの端末に保存されます。", 14, c.muted)}
               </>
             )}
             {screen === "mode" && (
               <>
                 {heading(
-                  "YOUR NEXT STEP",
+                  "学習メニュー",
                   `${band}点への、一歩。`,
                   `${total}語のうち、${mastered}語を習得済み。`,
                 )}
@@ -445,7 +475,7 @@ function LearningApp() {
                   ]}
                 >
                   {text("覚える", 24)}
-                  {text("意味を思い出してから、答え合わせ。", 14, c.muted)}
+                  {text("意味を思い出してから、答え合わせ。", 16, c.muted)}
                   {button(`覚えていない単語（${total - mastered}語）`, () =>
                     startStudy(true),
                   )}
@@ -464,11 +494,11 @@ function LearningApp() {
                   {text("確かめる", 24)}
                   {text(
                     "4択・10問。未習得の単語を優先して出題します。",
-                    14,
+                    16,
                     c.muted,
                   )}
                   {button("4択クイズを始める →", startQuiz)}
-                  {text("間違えた単語は「まだ」に戻ります。", 12, c.muted)}
+                  {text("間違えた単語は「まだ」に戻ります。", 14, c.muted)}
                 </View>
               </>
             )}
@@ -476,24 +506,16 @@ function LearningApp() {
               (word ? (
                 <>
                   <View style={s.row}>
-                    {text("FLASHCARDS", 12, c.accent)}
-                    {text(`${index + 1} / ${queue.length}`, 14, c.muted)}
+                    {text("フラッシュカード", 14, c.accent)}
+                    {text(`${index + 1} / ${queue.length}`, 16, c.muted)}
                   </View>
                   {meter(index, queue.length)}
                   {wordCard(word, revealed)}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={revealed ? "タップして次へ" : "タップして意味を表示"}
-                    onPress={() => revealed ? advanceCard() : setRevealed(true)}
-                    style={s.studyTapArea}
-                  >
-                    {text(revealed ? "タップして次へ" : "タップして意味を表示", 13, c.muted)}
-                  </Pressable>
                 </>
               ) : (
                 <>
                   {heading(
-                    "ALL CLEAR",
+                    "すべて習得",
                     "このレベルは習得済み！",
                     "全ての単語でおさらいすることもできます。",
                   )}
@@ -503,7 +525,7 @@ function LearningApp() {
             {screen === "studyResult" && (
               <>
                 {heading(
-                  "NICE WORK",
+                  "おつかれさまでした",
                   "ひと区切り、完了。",
                   `${queue.length}語を確認しました。少しずつ、確かな力に。`,
                 )}
@@ -516,11 +538,11 @@ function LearningApp() {
                 <>
                   <View style={s.row}>
                     {text(
-                      `QUIZ ${index + 1} / ${questions.length}`,
-                      12,
+                      `4択クイズ ${index + 1} / ${questions.length}問`,
+                      14,
                       c.accent,
                     )}
-                    {text(`正解 ${correct}`, 14, c.muted)}
+                    {text(`正解 ${correct}`, 16, c.muted)}
                   </View>
                   {meter(index, questions.length)}
                   {wordCard(question.word, selected !== null)}
@@ -540,38 +562,21 @@ function LearningApp() {
                           {
                             backgroundColor: isCorrect ? c.soft : c.card,
                             borderColor: isWrong
-                              ? "#BA5E42"
+                              ? c.wrongBorder
                               : isCorrect
                                 ? c.accent
-                                : c.line,
+                                : c.border,
                           },
                         ]}
                       >
                         {text(
                           `${isCorrect ? "✓" : isWrong ? "×" : String.fromCharCode(65 + i)}   ${choice}`,
                           17,
-                          isWrong ? (dark ? "#FFA487" : "#9A4329") : c.ink,
+                          isWrong ? c.wrong : c.ink,
                         )}
                       </Pressable>
                     );
                   })}
-                  {selected !== null && (
-                    <>
-                      {text(
-                        selected === question.correctIndex
-                          ? "正解です！"
-                          : "「まだ」に追加しました。あとで復習しましょう。",
-                        14,
-                        c.accent,
-                      )}
-                      {button(
-                        index + 1 === questions.length
-                          ? "結果を見る"
-                          : "次の問題 →",
-                        nextQuestion,
-                      )}
-                    </>
-                  )}
                 </>
               ) : (
                 <>
@@ -582,7 +587,7 @@ function LearningApp() {
             {screen === "result" && (
               <>
                 {heading(
-                  "QUIZ COMPLETE",
+                  "クイズの結果",
                   `${correct} / ${questions.length}`,
                   correct === questions.length
                     ? "全問正解！その調子です。"
@@ -609,7 +614,7 @@ function LearningApp() {
                             onPress={() => speak(w.word)}
                             style={s.back}
                           >
-                            {text("発音", 14, c.accent)}
+                            {text("🔊 発音", 16, c.accent)}
                           </Pressable>
                         </View>
                         {text(w.meaning, 16, c.muted)}
@@ -624,6 +629,37 @@ function LearningApp() {
           </Animated.View>
         )}
       </ScrollView>
+      {ready &&
+        screen === "study" &&
+        word &&
+        footer(
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            {markButton("まだ", "まだとして保存して次へ", false)}
+            {markButton("覚えた ✓", "覚えたとして保存して次へ", true)}
+          </View>,
+        )}
+      {ready &&
+        screen === "quiz" &&
+        question &&
+        selected !== null &&
+        footer(
+          <>
+            <Text
+              style={[
+                s.feedback,
+                { color: selected === question.correctIndex ? c.accent : c.wrong },
+              ]}
+            >
+              {selected === question.correctIndex
+                ? "✓ 正解です！"
+                : "× 不正解。「まだ」に追加しました。"}
+            </Text>
+            {button(
+              index + 1 === questions.length ? "結果を見る" : "次の問題 →",
+              nextQuestion,
+            )}
+          </>,
+        )}
     </SafeAreaView>
   );
 }
@@ -647,23 +683,26 @@ const s = StyleSheet.create({
     paddingBottom: 44,
   },
   heading: { gap: 12, paddingVertical: 18 },
-  studyTapArea: {
-    flexGrow: 1,
-    minHeight: 120,
-    marginTop: -18,
-    marginHorizontal: -22,
-    paddingTop: 34,
-    paddingBottom: 24,
-    paddingHorizontal: 22,
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
   hero: {
-    fontSize: 34,
-    lineHeight: 46,
+    fontSize: 30,
+    lineHeight: 40,
     fontWeight: "700",
-    letterSpacing: -0.8,
+    letterSpacing: -0.6,
   },
+  heroCompact: { fontSize: 22, lineHeight: 30, letterSpacing: -0.3 },
+  hint: { fontSize: 15, lineHeight: 22, textAlign: "center", paddingTop: 4 },
+  footer: { borderTopWidth: 1, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 16 },
+  footerInner: { width: "100%", maxWidth: 556, alignSelf: "center", gap: 10 },
+  markButton: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  feedback: { fontSize: 17, lineHeight: 24, fontWeight: "700", textAlign: "center" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -677,11 +716,9 @@ const s = StyleSheet.create({
   levelNumber: { fontSize: 28, fontWeight: "700" },
   card: { borderWidth: 1, borderRadius: 26, padding: 24, gap: 20 },
   word: {
-    fontSize: 40,
-    lineHeight: 52,
     fontWeight: "700",
     textAlign: "center",
-    marginVertical: 28,
+    marginTop: 20,
   },
   meaning: { borderTopWidth: 1, paddingTop: 24, gap: 16 },
   meaningText: { fontSize: 24, fontWeight: "600" },
@@ -693,7 +730,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  buttonText: { fontSize: 16, fontWeight: "700", textAlign: "center" },
+  buttonText: { fontSize: 17, fontWeight: "700", textAlign: "center" },
   choice: {
     minHeight: 60,
     borderRadius: 16,
