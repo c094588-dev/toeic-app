@@ -13,6 +13,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as Speech from "expo-speech";
+import { setAudioModeAsync } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import data from "../words.json";
@@ -195,6 +196,13 @@ function LearningApp() {
       useNativeDriver: true,
     }).start();
   }, [screen, index]);
+  useEffect(() => {
+    // iPhone のマナーモード（消音スイッチ）でも発音が聞こえるようにする。
+    // 音楽などほかのアプリの音は止めずに重ねて鳴らす
+    setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" }).catch(
+      () => {},
+    );
+  }, []);
   useEffect(
     () => () => {
       void Speech.stop();
