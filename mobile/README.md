@@ -1,4 +1,4 @@
-# TOEIC 単語ノート / React Native + Expo
+# 英単語ノート / React Native + Expo
 
 iOS・Android・Web共通のTOEIC単語アプリです。以前のSwift版とWeb版（`index.html`）は削除しました（gitの履歴には残っています）。
 
