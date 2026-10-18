@@ -2,6 +2,7 @@
   "expo": {
     "name": "英単語ノート",
     "slug": "toeic-word-note",
+    "owner": "soruy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,6 +24,9 @@
           "dark": { "image": "./assets/splash-icon.png", "backgroundColor": "#111B22" }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": { "projectId": "610f1679-02c0-4cb4-89e3-20860c72eecd" }
+    }
   }
 }
