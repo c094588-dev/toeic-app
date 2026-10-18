@@ -3,3 +3,7 @@ node_modules/
 dist/
 web-build/
 *.tsbuildinfo
+
+# Expo prebuild で生成するネイティブプロジェクト（app.json から毎回作るので管理しない）
+ios/
+android/

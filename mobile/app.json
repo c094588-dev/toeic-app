@@ -1,12 +1,28 @@
 {
   "expo": {
-    "name": "TOEIC 単語ノート",
+    "name": "英単語ノート",
     "slug": "toeic-word-note",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "ios": { "supportsTablet": true },
+    "ios": {
+      "bundleIdentifier": "com.eitangonote.app",
+      "supportsTablet": false,
+      "config": { "usesNonExemptEncryption": false }
+    },
     "android": {},
-    "web": { "bundler": "metro" }
+    "web": { "bundler": "metro" },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#F5F6F2",
+          "dark": { "image": "./assets/splash-icon.png", "backgroundColor": "#111B22" }
+        }
+      ]
+    ]
   }
 }

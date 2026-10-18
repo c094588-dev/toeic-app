@@ -170,7 +170,7 @@ function LearningApp() {
   const mastered = masteredByBand.get(band) ?? 0;
   const weak = weakByBand.get(band) ?? 0;
   const title =
-    screen === "home" ? "TOEIC 単語ノート" : isToday ? "今日の学習" : `TOEIC ${band}点`;
+    screen === "home" ? "英単語ノート" : isToday ? "今日の学習" : `TOEIC ${band}点`;
   function go(next: Screen) {
     void Speech.stop();
     setScreen(next);
@@ -735,6 +735,11 @@ function LearningApp() {
                   );
                 })}
                 {text("進捗はこの端末に保存されます。", 14, c.muted)}
+                {text(
+                  "TOEIC は ETS の登録商標です。このアプリは ETS の承認・推奨を受けたものではありません。",
+                  14,
+                  c.muted,
+                )}
               </>
             )}
             {screen === "mode" && (
