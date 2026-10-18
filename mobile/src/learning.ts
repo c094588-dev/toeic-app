@@ -199,3 +199,87 @@ export function makeQuiz(
     return [{ word, choices, correctIndex: choices.indexOf(word.meaning) }];
   });
 }
+
+// ---- 今日の学習 ----
+export const BANDS = [500, 600, 700, 800, 900];
+/** 1日の目標語数 */
+export const DAILY_GOAL = 20;
+/** 覚えた単語を、最後に見てから何日で復習に出すか */
+export const REVIEW_AFTER_DAYS = 7;
+function startOfDay(now: number): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+/** 今日学習した単語の数（今日「まだ」「覚えた」を記録した単語と、今日クイズに答えた単語） */
+export function studiedToday(progress: Progress, now = Date.now()): number {
+  const start = startOfDay(now);
+  return Object.values(progress.stats ?? {}).filter((s) => s.seen >= start).length;
+}
+export type TodayPlan = { words: Word[]; weak: number; review: number; fresh: number };
+/**
+ * 今日の学習で出す単語を選ぶ。目標スコア以下のレベルから、
+ * 苦手な単語（最大 半分）→ 復習の時期が来た覚えた単語（最大 1/4）→ 新しい単語（低いレベルから）の順。
+ * 今日すでに学習した単語は、足りないときだけ使う。
+ */
+export function todayPlan(
+  words: Word[],
+  progress: Progress,
+  target: number,
+  size = DAILY_GOAL,
+  now = Date.now(),
+  random = Math.random,
+): TodayPlan {
+  const today = startOfDay(now);
+  const mastered = new Set(progress.mastered);
+  const seenToday = (w: Word) => (progress.stats?.[w.No]?.seen ?? -1) >= today;
+  const eligible = words.filter((w) => w.score_band <= target);
+  const fresh = eligible.filter((w) => !seenToday(w));
+
+  const weak = orderByPriority(
+    fresh.filter((w) => isWeak(progress, w.No)),
+    progress,
+    now,
+    random,
+  ).slice(0, Math.ceil(size / 2));
+  const review = orderByPriority(
+    fresh.filter((w) => {
+      if (!mastered.has(w.No)) return false;
+      const seen = progress.stats?.[w.No]?.seen;
+      return seen === undefined || now - seen >= REVIEW_AFTER_DAYS * DAY;
+    }),
+    progress,
+    now,
+    random,
+  ).slice(0, Math.floor(size / 4));
+  const chosen = new Set([...weak, ...review].map((w) => w.No));
+  // 新しい単語は低いレベルから（同じレベルの中はばらばら）
+  const newWords = BANDS.flatMap((b) =>
+    shuffle(
+      fresh.filter(
+        (w) =>
+          w.score_band === b &&
+          !mastered.has(w.No) &&
+          !isWeak(progress, w.No) &&
+          !chosen.has(w.No),
+      ),
+      random,
+    ),
+  ).slice(0, size - chosen.size);
+  newWords.forEach((w) => chosen.add(w.No));
+
+  // 足りなければ、残りの単語を優先度順で補う（今日学習した単語は最後）
+  const filler =
+    chosen.size < size
+      ? [
+          ...orderByPriority(fresh.filter((w) => !chosen.has(w.No)), progress, now, random),
+          ...orderByPriority(eligible.filter((w) => seenToday(w)), progress, now, random),
+        ].slice(0, size - chosen.size)
+      : [];
+  return {
+    words: [...weak, ...review, ...newWords, ...filler],
+    weak: weak.length,
+    review: review.length,
+    fresh: newWords.length,
+  };
+}

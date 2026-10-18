@@ -184,3 +184,63 @@ test("クイズ: 苦手な単語が10語以上あれば、10問すべて苦手�
     assert.ok(quiz.every((q) => weak.includes(q.word.No)));
   }
 });
+
+// ---- 今日の学習 ----
+import { todayPlan, studiedToday, DAILY_GOAL } from "../src/learning.ts";
+// 正午を「今」にして、日付の境目をまたがないようにする
+const NOON = new Date(2026, 9, 18, 12).getTime();
+
+test("今日の学習: 何も学習していなければ、目標スコア以下の低いレベルの新しい単語20語", () => {
+  const plan = todayPlan(words, { mastered: [], notYet: [] }, 700, DAILY_GOAL, NOON);
+  assert.equal(plan.words.length, 20);
+  assert.equal(new Set(plan.words.map((w) => w.No)).size, 20);
+  assert.ok(plan.words.every((w) => w.score_band === 500));
+  assert.deepEqual([plan.weak, plan.review, plan.fresh], [0, 0, 20]);
+});
+
+test("今日の学習: 苦手な単語(最大10) → 復習時期の覚えた単語(最大5) → 新しい単語の順", () => {
+  const weak = band500.slice(0, 15);
+  const old = band500.slice(20, 30);
+  const recent = band500.slice(30, 35);
+  const stats = {};
+  for (const id of weak) stats[id] = { miss: 1, seen: NOON - 2 * DAY };
+  for (const id of old) stats[id] = { miss: 0, seen: NOON - 10 * DAY };
+  for (const id of recent) stats[id] = { miss: 0, seen: NOON - 1 * DAY };
+  const p = { mastered: [...old, ...recent], notYet: weak, stats };
+  const plan = todayPlan(words, p, 500, DAILY_GOAL, NOON);
+  const ids = plan.words.map((w) => w.No);
+  assert.deepEqual([plan.weak, plan.review, plan.fresh], [10, 5, 5]);
+  assert.ok(ids.slice(0, 10).every((id) => weak.includes(id)));
+  assert.ok(ids.slice(10, 15).every((id) => old.includes(id)));
+  assert.ok(ids.slice(15).every((id) => !weak.includes(id) && !old.includes(id) && !recent.includes(id)));
+});
+
+test("今日の学習: 目標スコアより上のレベルは出さない", () => {
+  const plan = todayPlan(words, { mastered: [], notYet: [] }, 500, DAILY_GOAL, NOON);
+  assert.ok(plan.words.every((w) => w.score_band <= 500));
+});
+
+test("今日の学習: 低いレベルを覚え終えたら、次のレベルの新しい単語に進む", () => {
+  const stats = Object.fromEntries(band500.map((id) => [id, { miss: 0, seen: NOON - DAY }]));
+  const p = { mastered: band500, notYet: [], stats };
+  const plan = todayPlan(words, p, 700, DAILY_GOAL, NOON);
+  assert.ok(plan.words.every((w) => w.score_band === 600));
+});
+
+test("今日の学習: 今日すでに学習した単語は、2回目では後回し", () => {
+  const first = todayPlan(words, { mastered: [], notYet: [] }, 500, DAILY_GOAL, NOON);
+  const stats = Object.fromEntries(first.words.map((w) => [w.No, { miss: 0, seen: NOON - 60_000 }]));
+  const p = { mastered: first.words.map((w) => w.No), notYet: [], stats };
+  assert.equal(studiedToday(p, NOON), 20);
+  const second = todayPlan(words, p, 500, DAILY_GOAL, NOON);
+  assert.ok(second.words.every((w) => !stats[w.No]));
+});
+
+test("今日学習した数は、今日の記録だけを数える", () => {
+  const p = {
+    mastered: [],
+    notYet: [],
+    stats: { 1: { miss: 0, seen: NOON - 60_000 }, 2: { miss: 1, seen: NOON - DAY } },
+  };
+  assert.equal(studiedToday(p, NOON), 1);
+});

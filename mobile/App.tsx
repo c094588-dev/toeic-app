@@ -17,9 +17,13 @@ import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import data from "../words.json";
 import {
+  BANDS,
+  DAILY_GOAL,
   isWeak,
   makeQuiz,
+  studiedToday,
   studyWords,
+  todayPlan,
   type Question,
   type StudyMode,
   type Word,
@@ -29,7 +33,7 @@ import { useProgress } from "./src/useProgress";
 const words: Word[] = data;
 const validIds = new Set(words.map((w) => w.No));
 const SETTINGS_KEY = "toeic.settings.v1";
-const bands = [500, 600, 700, 800, 900];
+const bands = BANDS;
 const labels = [
   "基礎を、確かな力に。",
   "仕事の英語に、一歩先へ。",
@@ -117,25 +121,46 @@ function LearningApp() {
   const [reverseCards, setReverseCards] = useState(false);
   // 単語が表示されたら自動で発音する（イヤホン利用を想定して既定はオン）
   const [autoSpeak, setAutoSpeak] = useState(true);
+  // 目標スコア（500〜900）。未設定なら null
+  const [target, setTarget] = useState<number | null>(null);
+  const [editingTarget, setEditingTarget] = useState(false);
   useEffect(() => {
     AsyncStorage.getItem(SETTINGS_KEY)
       .then((raw) => {
         const saved = raw ? JSON.parse(raw) : null;
         if (typeof saved?.autoSpeak === "boolean") setAutoSpeak(saved.autoSpeak);
+        if (BANDS.includes(saved?.target)) setTarget(saved.target);
       })
       .catch(() => {});
   }, []);
+  function saveSettings(next: { autoSpeak: boolean; target: number | null }) {
+    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)).catch(() => {});
+  }
   function toggleAutoSpeak() {
     const next = !autoSpeak;
     setAutoSpeak(next);
     if (!next) void Speech.stop();
-    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({ autoSpeak: next })).catch(() => {});
+    saveSettings({ autoSpeak: next, target });
+  }
+  function chooseTarget(score: number) {
+    setTarget(score);
+    setEditingTarget(false);
+    saveSettings({ autoSpeak, target: score });
   }
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
   const [wrong, setWrong] = useState<Word[]>([]);
-  const [studyMode, setStudyMode] = useState<StudyMode>("unmastered");
+  // 学習の種類（レベル別の各モード、または「今日の学習」）
+  const [studyMode, setStudyMode] = useState<StudyMode | "today">("unmastered");
+  const isToday = studyMode === "today" && (screen === "study" || screen === "studyResult");
+  const doneToday = useMemo(() => studiedToday(progress), [progress]);
+  // 今日の残り語数（目標達成後は「もう少し」10語ずつ）
+  const todaySize = doneToday >= DAILY_GOAL ? 10 : Math.max(5, DAILY_GOAL - doneToday);
+  const plan = useMemo(
+    () => (target ? todayPlan(words, progress, target, todaySize) : null),
+    [target, progress, todaySize],
+  );
   const answerLock = useRef(false);
   const fade = useRef(new Animated.Value(1)).current;
   const scroll = useRef<ScrollView>(null);
@@ -144,13 +169,14 @@ function LearningApp() {
   const total = words.filter((w) => w.score_band === band).length;
   const mastered = masteredByBand.get(band) ?? 0;
   const weak = weakByBand.get(band) ?? 0;
-  const title = screen === "home" ? "TOEIC 単語ノート" : `TOEIC ${band}点`;
+  const title =
+    screen === "home" ? "TOEIC 単語ノート" : isToday ? "今日の学習" : `TOEIC ${band}点`;
   function go(next: Screen) {
     void Speech.stop();
     setScreen(next);
   }
   function back() {
-    go(screen === "mode" ? "home" : "mode");
+    go(screen === "mode" || isToday ? "home" : "mode");
   }
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -188,8 +214,11 @@ function LearningApp() {
   function autoSpeakWord(value: string | undefined) {
     if (autoSpeak && value) speak(value);
   }
-  function startStudy(mode: StudyMode) {
-    const next = studyWords(words, band, progress, mode);
+  function startStudy(mode: StudyMode | "today") {
+    const next =
+      mode === "today"
+        ? todayPlan(words, progress, target ?? BANDS[0], todaySize).words
+        : studyWords(words, band, progress, mode);
     setStudyMode(mode);
     setQueue(next);
     setIndex(0);
@@ -425,6 +454,102 @@ function LearningApp() {
       </View>
     );
   }
+  function targetChips() {
+    return (
+      <View style={s.chips}>
+        {BANDS.map((score) => {
+          const on = target === score;
+          return (
+            <Pressable
+              key={score}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`目標スコア ${score}点`}
+              onPress={() => chooseTarget(score)}
+              style={({ pressed }) => [
+                s.chip,
+                {
+                  borderColor: on ? c.accent : c.border,
+                  backgroundColor: on ? c.accent : c.card,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  s.chipText,
+                  { color: on ? (dark ? "#102A28" : "#FFFFFF") : c.ink, fontWeight: on ? "700" : "500" },
+                ]}
+              >
+                {score}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
+  /** ホームの「今日の学習」。目標スコアに合わせて、その日に学習する単語をおまかせで選ぶ */
+  function todayCard() {
+    if (!target || editingTarget)
+      return (
+        <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+          {text("目標スコアを選んでください", 22)}
+          {text(
+            "目標までのレベルから、「今日の学習」で毎日20語をおまかせで出します。あとで変えられます。",
+            16,
+            c.muted,
+          )}
+          {targetChips()}
+          {target && button("キャンセル", () => setEditingTarget(false), true)}
+        </View>
+      );
+    const reached = doneToday >= DAILY_GOAL;
+    return (
+      <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+        <View style={s.row}>
+          {text("今日の学習", 22)}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`目標スコア ${target}点。タップして変更`}
+            onPress={() => setEditingTarget(true)}
+            style={({ pressed }) => [
+              s.pill,
+              { borderColor: c.border, backgroundColor: c.card, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Text style={[s.pillText, { color: c.accent }]}>目標 {target}点 ›</Text>
+          </Pressable>
+        </View>
+        <View style={{ gap: 8 }}>
+          <View style={s.row}>
+            {text(reached ? "今日の目標、達成！" : "今日の進み具合", 16, reached ? c.accent : c.ink)}
+            <Text style={[s.todayCount, { color: c.accent }]}>
+              {doneToday}
+              <Text style={{ fontSize: 16 }}> / {DAILY_GOAL}語</Text>
+            </Text>
+          </View>
+          {meter(Math.min(doneToday, DAILY_GOAL), DAILY_GOAL)}
+        </View>
+        {plan &&
+          text(
+            [
+              plan.weak > 0 && `苦手 ${plan.weak}語`,
+              plan.review > 0 && `復習 ${plan.review}語`,
+              plan.fresh > 0 && `新しい単語 ${plan.fresh}語`,
+            ]
+              .filter(Boolean)
+              .join("・") || "出せる単語がありません",
+            16,
+            c.muted,
+          )}
+        {button(
+          reached ? "もう少し学習する" : doneToday > 0 ? "今日の学習を続ける" : "今日の学習を始める",
+          () => startStudy("today"),
+        )}
+      </View>
+    );
+  }
   /** 画面下に固定するボタン欄（親指が届きやすい位置に主な操作を置く） */
   function footer(content: React.ReactNode) {
     return (
@@ -557,9 +682,10 @@ function LearningApp() {
                 {heading(
                   "",
                   "今日のひとことが、\n明日の自信に。",
-                  "目標に合うレベルを選んでください。",
+                  "今日の学習か、レベルを選びましょう。",
                   true,
                 )}
+                {todayCard()}
                 <View style={[s.summary, { backgroundColor: c.soft }]}>
                   <View style={s.row}>
                     {text("覚えた単語", 16, c.ink)}
@@ -701,7 +827,7 @@ function LearningApp() {
                   <View style={s.row}>
                     <View style={{ flexShrink: 1 }}>
                       {text(
-                        reverseCards ? "フラッシュカード（日本語 → 英語）" : "フラッシュカード",
+                        `${isToday ? "今日の学習" : "フラッシュカード"}${reverseCards ? "（日本語 → 英語）" : ""}`,
                         14,
                         c.accent,
                       )}
@@ -714,23 +840,36 @@ function LearningApp() {
                 </Pressable>
               ) : (
                 <>
-                  {heading(
-                    "すべて習得",
-                    "このレベルは習得済み！",
-                    "全ての単語でおさらいすることもできます。",
+                  {isToday ? (
+                    <>
+                      {heading("今日の学習", "出せる単語がありません", "目標スコアを上げると、新しい単語が増えます。")}
+                      {button("ホームに戻る", () => go("home"))}
+                    </>
+                  ) : (
+                    <>
+                      {heading(
+                        "すべて習得",
+                        "このレベルは習得済み！",
+                        "全ての単語でおさらいすることもできます。",
+                      )}
+                      {button("全ての単語を復習する", () => startStudy("all"))}
+                    </>
                   )}
-                  {button("全ての単語を復習する", () => startStudy("all"))}
                 </>
               ))}
             {screen === "studyResult" && (
               <>
                 {heading(
                   "おつかれさまでした",
-                  "ひと区切り、完了。",
-                  `${queue.length}語を確認しました。少しずつ、確かな力に。`,
+                  isToday && doneToday >= DAILY_GOAL ? "今日の目標、達成！" : "ひと区切り、完了。",
+                  isToday
+                    ? `今日は${doneToday}語を学習しました（目標 ${DAILY_GOAL}語）。`
+                    : `${queue.length}語を確認しました。少しずつ、確かな力に。`,
                 )}
-                {button("もう一度学習する", () => startStudy(studyMode))}
-                {button("レベルのメニューに戻る", () => go("mode"), true)}
+                {button(isToday ? "もう少し学習する" : "もう一度学習する", () => startStudy(studyMode))}
+                {isToday
+                  ? button("ホームに戻る", () => go("home"), true)
+                  : button("レベルのメニューに戻る", () => go("mode"), true)}
               </>
             )}
             {screen === "quiz" &&
@@ -902,6 +1041,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
   toggleText: { fontSize: 15, lineHeight: 20, textAlign: "center" },
+  chips: { flexDirection: "row", gap: 6 },
+  chip: {
+    flexBasis: 0,
+    flexGrow: 1,
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2,
+  },
+  chipText: { fontSize: 17, lineHeight: 22 },
+  todayCount: { fontSize: 26, fontWeight: "700" },
   weakBadge: {
     alignSelf: "flex-start",
     borderWidth: 1,
