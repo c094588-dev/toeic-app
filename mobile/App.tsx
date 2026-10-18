@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as Speech from "expo-speech";
-import { setAudioModeAsync } from "expo-audio";
+import { setAudioModeAsync, setIsAudioActiveAsync } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import data from "../words.json";
@@ -43,6 +44,14 @@ const labels = [
   "高得点へ、最後のひと押し。",
 ];
 type Screen = "home" | "mode" | "study" | "studyResult" | "quiz" | "result";
+/**
+ * iPhone のマナーモード（消音スイッチ）でも発音が聞こえるように、音声の設定を
+ * 「消音中も再生する」にして有効にする。音楽などほかのアプリの音は止めずに重ねて鳴らす
+ */
+async function allowSoundInSilentMode() {
+  await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" });
+  await setIsAudioActiveAsync(true);
+}
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -140,7 +149,7 @@ function LearningApp() {
   function toggleAutoSpeak() {
     const next = !autoSpeak;
     setAutoSpeak(next);
-    if (!next) void Speech.stop();
+    if (!next) stopSpeech();
     saveSettings({ autoSpeak: next, target });
   }
   function chooseTarget(score: number) {
@@ -163,6 +172,8 @@ function LearningApp() {
     [target, progress, todaySize],
   );
   const answerLock = useRef(false);
+  // 読み上げの番号。止めたら進めて、止める前に頼んだ読み上げを始めないようにする
+  const speechTurn = useRef(0);
   const fade = useRef(new Animated.Value(1)).current;
   const scroll = useRef<ScrollView>(null);
   const word = queue[index];
@@ -173,7 +184,7 @@ function LearningApp() {
   const title =
     screen === "home" ? "英単語ノート" : isToday ? "今日の学習" : `TOEIC ${band}点`;
   function go(next: Screen) {
-    void Speech.stop();
+    stopSpeech();
     setScreen(next);
   }
   function back() {
@@ -196,27 +207,32 @@ function LearningApp() {
       useNativeDriver: true,
     }).start();
   }, [screen, index]);
-  useEffect(() => {
-    // iPhone のマナーモード（消音スイッチ）でも発音が聞こえるようにする。
-    // 音楽などほかのアプリの音は止めずに重ねて鳴らす
-    setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" }).catch(
-      () => {},
-    );
-  }, []);
   useEffect(
     () => () => {
-      void Speech.stop();
+      stopSpeech();
     },
     [],
   );
   function speak(text: string) {
     speakAll([text]);
   }
+  function stopSpeech() {
+    speechTurn.current += 1;
+    void Speech.stop();
+  }
   /** 続けて読み上げる（単語 → 例文など）。前の読み上げは止める */
   function speakAll(texts: string[]) {
-    void Speech.stop();
-    for (const t of texts)
-      Speech.speak(t, { language: "en-US", rate: 0.88, onError: () => {} });
+    stopSpeech();
+    const turn = speechTurn.current;
+    const start = () => {
+      if (turn !== speechTurn.current) return;
+      for (const t of texts)
+        Speech.speak(t, { language: "en-US", rate: 0.88, onError: () => {} });
+    };
+    // iPhone では読み上げの直前に毎回、マナーモードでも鳴る設定にしてから読む。
+    // Web はタップの直後でないと音を出せないので、すぐに読む
+    if (Platform.OS === "ios") void allowSoundInSilentMode().catch(() => {}).finally(start);
+    else start();
   }
   // 自動発音はタップの処理の中で呼ぶ（スマホのブラウザは操作直後でないと音を出せないため）
   function autoSpeakWord(value: string | undefined) {
@@ -266,7 +282,7 @@ function LearningApp() {
     answerLock.current = true;
     if (markAs !== undefined) record(word.No, markAs);
     void Haptics.selectionAsync().catch(() => {});
-    void Speech.stop();
+    stopSpeech();
     setRevealed(false);
     if (index + 1 >= queue.length) go("studyResult");
     else {
@@ -294,7 +310,7 @@ function LearningApp() {
   }
   function nextQuestion() {
     if (selected === null) return;
-    void Speech.stop();
+    stopSpeech();
     setSelected(null);
     if (index + 1 >= questions.length) go("result");
     else {
