@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   BackHandler,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -43,6 +44,8 @@ const labels = [
   "高得点へ、最後のひと押し。",
 ];
 type Screen = "home" | "mode" | "study" | "studyResult" | "quiz" | "result";
+/** 学習カードをこの距離（px）以上、左右に動かしたら「まだ」「覚えた」を記録する */
+const SWIPE_DISTANCE = 90;
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -165,6 +168,53 @@ function LearningApp() {
   const answerLock = useRef(false);
   const fade = useRef(new Animated.Value(1)).current;
   const scroll = useRef<ScrollView>(null);
+  // 学習画面: タップで答えの表示・次へ、左右のスワイプで「まだ」（左）「覚えた」（右）
+  const swipeX = useRef(new Animated.Value(0)).current;
+  const studyActions = useRef({ tap: () => {}, mark: (_mastered: boolean) => {} });
+  studyActions.current = {
+    tap: studyTap,
+    mark: (mastered) => {
+      if (answerLock.current) return;
+      // 次のカードは元の位置からフェードインさせる
+      fade.setValue(0);
+      swipeX.setValue(0);
+      advanceCard(mastered);
+    },
+  };
+  // 指を動かしたか（動かしてから元の位置に戻した場合はタップにしない）
+  const studyMoved = useRef(false);
+  const studyPan = useRef(
+    PanResponder.create({
+      // 学習画面のどこから触っても受け取る（中のボタンは、ボタンの方が優先される）
+      onStartShouldSetPanResponder: () => true,
+      // ボタンの上から始めても、横に動かしたらスワイプとして受け取る
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        Math.abs(g.dx) >= 10 && Math.abs(g.dx) > Math.abs(g.dy),
+      // 横に動かし始めたら、縦のスクロールに取られないようにする
+      onPanResponderTerminationRequest: (_, g) => Math.abs(g.dx) < 10,
+      onPanResponderGrant: () => {
+        studyMoved.current = false;
+      },
+      onPanResponderMove: (_, g) => {
+        if (Math.abs(g.dx) >= 10 || Math.abs(g.dy) >= 10) studyMoved.current = true;
+        swipeX.setValue(g.dx);
+      },
+      onPanResponderRelease: (_, g) => {
+        const flicked = Math.abs(g.vx) > 0.6 && Math.abs(g.dx) > 40;
+        if (Math.abs(g.dx) >= SWIPE_DISTANCE || flicked) {
+          studyActions.current.mark(g.dx > 0);
+        } else if (!studyMoved.current) {
+          swipeX.setValue(0);
+          studyActions.current.tap();
+        } else {
+          Animated.spring(swipeX, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(swipeX, { toValue: 0, useNativeDriver: true }).start();
+      },
+    }),
+  ).current;
   const word = queue[index];
   const question = questions[index];
   const total = words.filter((w) => w.score_band === band).length;
@@ -189,6 +239,7 @@ function LearningApp() {
   }, [screen]);
   useEffect(() => {
     scroll.current?.scrollTo({ y: 0, animated: false });
+    swipeX.setValue(0);
     fade.setValue(0);
     Animated.timing(fade, {
       toValue: 1,
@@ -365,6 +416,31 @@ function LearningApp() {
       </View>
     );
   }
+  /** スワイプ中にカードの上に出す「覚えた」「まだ」の目印 */
+  function swipeStamp(
+    label: string,
+    color: string,
+    side: { left: number } | { right: number },
+    inputRange: number[],
+    outputRange: number[],
+  ) {
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          s.swipeStamp,
+          side,
+          {
+            borderColor: color,
+            backgroundColor: c.card,
+            opacity: swipeX.interpolate({ inputRange, outputRange, extrapolate: "clamp" }),
+          },
+        ]}
+      >
+        <Text style={[s.swipeStampText, { color }]}>{label}</Text>
+      </Animated.View>
+    );
+  }
   function wordCard(w: Word, showMeaning: boolean) {
     const studying = screen === "study";
     // 学習中のタップは画面全体で受けるので、カード内は表示だけ
@@ -442,7 +518,7 @@ function LearningApp() {
           <Pressable accessibilityRole="button" onPress={studyTap}>
             <Text style={[s.hint, { color: c.muted }]}>
               {showMeaning
-                ? "画面をタップすると、記録せずに次へ"
+                ? "右にスワイプで「覚えた」、左で「まだ」\nタップすると記録せずに次へ"
                 : reverse
                   ? "画面のどこかをタップして英単語を表示"
                   : "画面のどこかをタップして意味を表示"}
@@ -693,7 +769,6 @@ function LearningApp() {
                   "今日の学習か、レベルを選びましょう。",
                   true,
                 )}
-                {todayCard()}
                 <View style={[s.summary, { backgroundColor: c.soft }]}>
                   <View style={s.row}>
                     {text("覚えた単語", 16, c.ink)}
@@ -704,6 +779,7 @@ function LearningApp() {
                   </View>
                   {meter(progress.mastered.length, 1500)}
                 </View>
+                {todayCard()}
                 {bands.map((b, i) => {
                   const n = words.filter((w) => w.score_band === b).length;
                   const m = masteredByBand.get(b) ?? 0;
@@ -835,8 +911,9 @@ function LearningApp() {
             )}
             {screen === "study" &&
               (word ? (
-                // 画面のどこをタップしても答えの表示・次へ進める（片手・親指で操作しやすく）
-                <Pressable accessible={false} onPress={studyTap} style={s.studyArea}>
+                // 画面のどこをタップしても答えの表示・次へ進める（片手・親指で操作しやすく）。
+                // 左右にスワイプすると「まだ」「覚えた」を記録して次へ
+                <View {...studyPan.panHandlers} style={s.studyArea}>
                   <View style={s.row}>
                     <View style={{ flexShrink: 1 }}>
                       {text(
@@ -849,8 +926,24 @@ function LearningApp() {
                     {autoSpeakToggle()}
                   </View>
                   {meter(index, queue.length)}
-                  {wordCard(word, revealed)}
-                </Pressable>
+                  <Animated.View
+                    style={{
+                      transform: [
+                        { translateX: swipeX },
+                        {
+                          rotate: swipeX.interpolate({
+                            inputRange: [-300, 0, 300],
+                            outputRange: ["-6deg", "0deg", "6deg"],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    {wordCard(word, revealed)}
+                    {swipeStamp("覚えた ✓", c.accent, { left: 16 }, [0, SWIPE_DISTANCE], [0, 1])}
+                    {swipeStamp("まだ", c.wrong, { right: 16 }, [-SWIPE_DISTANCE, 0], [1, 0])}
+                  </Animated.View>
+                </View>
               ) : (
                 <>
                   {isToday ? (
@@ -1076,7 +1169,17 @@ const s = StyleSheet.create({
     marginBottom: -8,
   },
   weakBadgeText: { fontSize: 14, lineHeight: 20, fontWeight: "600" },
-  studyArea: { flexGrow: 1, gap: 18, paddingBottom: 44 },
+  // userSelect: Web でカードをマウスでドラッグしたとき、文字が選択されないようにする
+  studyArea: { flexGrow: 1, gap: 18, paddingBottom: 44, userSelect: "none" },
+  swipeStamp: {
+    position: "absolute",
+    top: 16,
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  swipeStampText: { fontSize: 18, lineHeight: 26, fontWeight: "800" },
   pill: {
     minHeight: 44,
     borderRadius: 22,
