@@ -117,9 +117,9 @@ Pronunciation uses the iOS built-in text-to-speech (AVSpeechSynthesizer).
 The app is a vocabulary study tool for the TOEIC Listening & Reading test. It is not affiliated with ETS, and the store description includes a trademark disclaimer.
 ```
 
-## スクリーンショット（iPhone 6.9インチ、1320×2868）
+## スクリーンショット（iPhone 6.3インチ、1206×2622）
 
-`screenshots/` の6枚を、番号の順にアップロードします。6.9インチの画像があれば、ほかの画面サイズでは自動で縮小して使われます。iPad には対応していないので、iPad 用の画像は不要です。
+`screenshots/` の6枚を、App Store Connect の「Dynamic Island搭載iPhone（中型ディスプレイ）」の欄に、番号の順にアップロードします（この欄が受け付けるのは 1206×2622 などの6.1・6.3インチのサイズで、1320×2868 の6.9インチは受け付けません）。ほかの画面サイズでは、この画像が自動で使われます。iPad には対応していないので、iPad 用の画像は不要です。
 
 | 番号 | 見出し | 画面 |
 | --- | --- | --- |
