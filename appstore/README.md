@@ -171,3 +171,24 @@ The app is not in a regulated industry. All word lists, example sentences, and t
 ![6](screenshots/6.png)
 
 画像は Web 版の画面に、見出しと iPhone の枠を付けて作っています。そのため絵文字（🔊）の絵柄だけは、実機の iPhone と少し違います。
+
+## ダウンロード数のレポート
+
+`report.mjs` は、App Store Connect API の売上レポートから、英単語ノートの日ごとの新規ダウンロード数・再ダウンロード数・アップデート数を取り出し、日本語でまとめます（直近7日、その前の7日との比較、公開からの累計、国別）。
+
+```
+node appstore/report.mjs            # 直近7日
+node appstore/report.mjs --days 30  # 直近30日
+node --test appstore/report.test.mjs
+```
+
+実行する環境に、次の環境変数が必要です（値はリポジトリやチャットには書かず、環境の設定にだけ登録します）。
+
+| 環境変数 | 中身 |
+| --- | --- |
+| `ASC_KEY_ID` | API キーの「キーID」 |
+| `ASC_ISSUER_ID` | API キーの「Issuer ID」 |
+| `ASC_API_KEY_BASE64` | ダウンロードした `.p8` を base64 にした文字列（Mac なら `base64 -i AuthKey_XXXX.p8 \| pbcopy`） |
+| `ASC_VENDOR_NUMBER` | 「支払いと財務報告」に表示されるベンダー番号 |
+
+API キーは「ユーザとアクセス」→「統合」→「App Store Connect API」→「チームキー」で作り、役割は売上レポートを読める「Sales（売上）」にします。通信先として `api.appstoreconnect.apple.com` を許可しておく必要があります。Apple の集計は1〜2日遅れなので、直近の日は「集計中」と表示されることがあります。
