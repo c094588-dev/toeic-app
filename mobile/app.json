@@ -3,16 +3,18 @@
     "name": "英単語ノート",
     "slug": "toeic-word-note",
     "owner": "soruy",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.eitangonote.app",
       "supportsTablet": false,
-      "config": { "usesNonExemptEncryption": false }
+      "config": { "usesNonExemptEncryption": false },
+      "infoPlist": { "CFBundleDevelopmentRegion": "ja" }
     },
     "android": {},
+    "locales": { "ja": "./locales/ja.json" },
     "web": { "bundler": "metro" },
     "plugins": [
       [
