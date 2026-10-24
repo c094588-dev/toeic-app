@@ -19,11 +19,14 @@ export type Question = { word: Word; choices: string[]; correctIndex: number };
 export type StudyMode = "weak" | "unmastered" | "all";
 export const emptyProgress = (): Progress => ({ mastered: [], notYet: [], stats: {} });
 const DAY = 24 * 60 * 60 * 1000;
+/** 残してよい単語の番号（番号の集合、または番号を調べる関数） */
+export type IdCheck = Set<number> | ((id: number) => boolean);
 export function parseProgress(
   raw: string | null,
-  validIds: Set<number>,
+  validIds: IdCheck,
 ): Progress {
   if (!raw) return emptyProgress();
+  const valid = typeof validIds === "function" ? validIds : (id: number) => validIds.has(id);
   const data = JSON.parse(raw);
   if (
     (data?.version !== 1 && data?.version !== 2) ||
@@ -34,7 +37,7 @@ export function parseProgress(
   const mastered = [
     ...new Set<number>(
       data.mastered.filter(
-        (id: unknown) => typeof id === "number" && validIds.has(id),
+        (id: unknown) => typeof id === "number" && valid(id),
       ),
     ),
   ];
@@ -43,7 +46,7 @@ export function parseProgress(
     ...new Set<number>(
       data.notYet.filter(
         (id: unknown) =>
-          typeof id === "number" && validIds.has(id) && !masteredSet.has(id),
+          typeof id === "number" && valid(id) && !masteredSet.has(id),
       ),
     ),
   ];
@@ -54,7 +57,7 @@ export function parseProgress(
       const id = Number(key);
       const stat = value as Partial<WordStat> | null;
       if (
-        validIds.has(id) &&
+        valid(id) &&
         Number.isFinite(stat?.miss) &&
         Number.isFinite(stat?.seen) &&
         (stat!.miss as number) >= 0 &&
@@ -68,7 +71,7 @@ export function parseProgress(
 /** 保存データを読み込む。壊れていれば空の進捗で始め、元データを退避できるよう corrupt で知らせる */
 export function restoreProgress(
   raw: string | null,
-  validIds: Set<number>,
+  validIds: IdCheck,
 ): { progress: Progress; corrupt: boolean } {
   try {
     return { progress: parseProgress(raw, validIds), corrupt: false };
@@ -102,6 +105,16 @@ export function mark(
       ...(!mastered ? [id] : []),
     ],
     stats: { ...progress.stats, [id]: { miss, seen: now } },
+  };
+}
+/** 単語の記録を消す（自分で登録した単語を削除したとき） */
+export function forgetWord(progress: Progress, id: number): Progress {
+  const stats = { ...progress.stats };
+  delete stats[id];
+  return {
+    mastered: progress.mastered.filter((n) => n !== id),
+    notYet: progress.notYet.filter((n) => n !== id),
+    stats,
   };
 }
 /** クイズで正解したとき。覚えた／まだ は変えず、苦手度を1下げる */
@@ -188,10 +201,12 @@ export function makeQuiz(
   const pool = words.filter((w) => w.score_band === band);
   // 苦手な単語を優先して選び、出題順はばらばらにする
   const targets = shuffle(orderByPriority(pool, progress, now).slice(0, count));
+  // 選択肢は同じレベルから選ぶ。単語が少ない（マイ単語帳など）ときは全ての単語から選ぶ
+  const choicePool = new Set(pool.map((w) => w.meaning)).size >= 4 ? pool : words;
   return targets.flatMap((word) => {
     const wrong = shuffle([
       ...new Set(
-        pool.filter((w) => w.meaning !== word.meaning).map((w) => w.meaning),
+        choicePool.filter((w) => w.meaning !== word.meaning).map((w) => w.meaning),
       ),
     ]).slice(0, 3);
     if (wrong.length < 3) return [];
@@ -253,8 +268,9 @@ export function todayPlan(
     random,
   ).slice(0, Math.floor(size / 4));
   const chosen = new Set([...weak, ...review].map((w) => w.No));
-  // 新しい単語は低いレベルから（同じレベルの中はばらばら）
-  const newWords = BANDS.flatMap((b) =>
+  // 新しい単語は低いレベルから（同じレベルの中はばらばら）。マイ単語帳（0）は最初
+  const bandsInPlan = [...new Set(eligible.map((w) => w.score_band))].sort((a, b) => a - b);
+  const newWords = bandsInPlan.flatMap((b) =>
     shuffle(
       fresh.filter(
         (w) =>

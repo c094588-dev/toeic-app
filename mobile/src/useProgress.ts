@@ -4,13 +4,15 @@ import {
   emptyProgress,
   mark,
   markQuizCorrect,
+  forgetWord,
   restoreProgress,
+  type IdCheck,
   type Progress,
 } from "./learning";
 const KEY = "toeic.progress.v1";
 // 読み込めなかった保存データの退避先（上書きで失わないように残す）
 const BACKUP_KEY = "toeic.progress.v1.corrupt";
-export function useProgress(validIds: Set<number>) {
+export function useProgress(validIds: IdCheck) {
   const [progress, setProgress] = useState<Progress>(emptyProgress);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -66,6 +68,11 @@ export function useProgress(validIds: Set<number>) {
     if (!ready) return;
     update(mark(current.current, id, mastered));
   }
+  /** 単語の記録を消す（自分で登録した単語を削除したとき） */
+  function forget(id: number) {
+    if (!ready) return;
+    update(forgetWord(current.current, id));
+  }
   /** クイズで正解したとき（苦手度を下げる） */
   function recordQuizCorrect(id: number) {
     if (!ready) return;
@@ -79,6 +86,7 @@ export function useProgress(validIds: Set<number>) {
     dismissNotice: () => setNotice(""),
     record,
     recordQuizCorrect,
+    forget,
     retry: () => (ready ? save(current.current) : void load()),
   };
 }

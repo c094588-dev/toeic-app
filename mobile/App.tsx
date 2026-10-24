@@ -7,6 +7,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  type TextInputProps,
   useColorScheme,
   useWindowDimensions,
   View,
@@ -32,8 +34,20 @@ import {
 } from "./src/learning";
 import { clozeExample } from "./src/cloze";
 import { useProgress } from "./src/useProgress";
-const words: Word[] = data;
-const validIds = new Set(words.map((w) => w.No));
+import { useCustomWords } from "./src/useCustomWords";
+import {
+  LIMITS,
+  MY_BAND,
+  findDuplicate,
+  isCustomId,
+  isCustomWord,
+  validateCustomWord,
+  type CustomWordInput,
+} from "./src/customWords";
+const builtinWords: Word[] = data;
+const validIds = new Set(builtinWords.map((w) => w.No));
+/** 進捗に残してよい単語の番号（収録単語と、自分で登録した単語） */
+const isKnownId = (id: number) => validIds.has(id) || isCustomId(id);
 const SETTINGS_KEY = "toeic.settings.v1";
 const bands = BANDS;
 const labels = [
@@ -43,7 +57,18 @@ const labels = [
   "難しい文も、読み解く力へ。",
   "高得点へ、最後のひと押し。",
 ];
-type Screen = "home" | "mode" | "study" | "studyResult" | "quiz" | "result";
+type Screen = "home" | "mode" | "study" | "studyResult" | "quiz" | "result" | "wordForm";
+/** レベルの名前（マイ単語帳は MY_BAND） */
+const bandName = (b: number) => (b === MY_BAND ? "マイ単語帳" : `${b}点レベル`);
+/** 1500 → "1,500" */
+const formatCount = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+const emptyForm = (band: number): CustomWordInput => ({
+  word: "",
+  meaning: "",
+  example: "",
+  example_ja: "",
+  score_band: band,
+});
 /** 学習カードをこの距離（px）以上、左右に動かしたら「まだ」「覚えた」を記録する */
 const SWIPE_DISTANCE = 90;
 export default function App() {
@@ -97,8 +122,19 @@ function LearningApp() {
     dismissNotice,
     record,
     recordQuizCorrect,
+    forget,
     retry,
-  } = useProgress(validIds);
+  } = useProgress(isKnownId);
+  // 自分で登録した単語（マイ単語帳、または 500〜900 のレベルに入れたもの）
+  const {
+    customWords,
+    ready: customReady,
+    error: customError,
+    add: addCustomWord,
+    edit: editCustomWord,
+    remove: removeCustomWord,
+  } = useCustomWords(BANDS);
+  const words = useMemo(() => [...builtinWords, ...customWords], [customWords]);
   // レベルごとの苦手な単語の数
   const weakByBand = useMemo(() => {
     const counts = new Map<number, number>();
@@ -106,7 +142,7 @@ function LearningApp() {
       if (isWeak(progress, w.No))
         counts.set(w.score_band, (counts.get(w.score_band) ?? 0) + 1);
     return counts;
-  }, [progress]);
+  }, [progress, words]);
   // レベルごとの習得数（配列の includes を毎回回さないよう Set で集計）
   const masteredByBand = useMemo(() => {
     const masteredSet = new Set(progress.mastered);
@@ -115,7 +151,9 @@ function LearningApp() {
       if (masteredSet.has(w.No))
         counts.set(w.score_band, (counts.get(w.score_band) ?? 0) + 1);
     return counts;
-  }, [progress.mastered]);
+  }, [progress.mastered, words]);
+  // 覚えた単語の数（削除した単語の記録は数えない）
+  const masteredTotal = [...masteredByBand.values()].reduce((sum, n) => sum + n, 0);
   const [screen, setScreen] = useState<Screen>("home");
   const [band, setBand] = useState(500);
   const [queue, setQueue] = useState<Word[]>([]);
@@ -128,6 +166,19 @@ function LearningApp() {
   // 目標スコア（500〜900）。未設定なら null
   const [target, setTarget] = useState<number | null>(null);
   const [editingTarget, setEditingTarget] = useState(false);
+  // 単語の登録・編集の画面
+  const [form, setForm] = useState<CustomWordInput>(() => emptyForm(MY_BAND));
+  // 編集中の単語の番号（新しく登録するときは null）
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formError, setFormError] = useState("");
+  const [formSaved, setFormSaved] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  // 登録画面を閉じたときに戻る画面
+  const [formFrom, setFormFrom] = useState<Screen>("home");
+  const duplicate = useMemo(
+    () => (screen === "wordForm" ? findDuplicate(words, form.word, editingId ?? undefined) : undefined),
+    [screen, words, form.word, editingId],
+  );
   useEffect(() => {
     AsyncStorage.getItem(SETTINGS_KEY)
       .then((raw) => {
@@ -163,7 +214,7 @@ function LearningApp() {
   const todaySize = doneToday >= DAILY_GOAL ? 10 : Math.max(5, DAILY_GOAL - doneToday);
   const plan = useMemo(
     () => (target ? todayPlan(words, progress, target, todaySize) : null),
-    [target, progress, todaySize],
+    [target, progress, todaySize, words],
   );
   const answerLock = useRef(false);
   const fade = useRef(new Animated.Value(1)).current;
@@ -221,13 +272,74 @@ function LearningApp() {
   const mastered = masteredByBand.get(band) ?? 0;
   const weak = weakByBand.get(band) ?? 0;
   const title =
-    screen === "home" ? "英単語ノート" : isToday ? "今日の学習" : `TOEIC ${band}点`;
+    screen === "home"
+      ? "英単語ノート"
+      : screen === "wordForm"
+        ? editingId === null
+          ? "単語を登録"
+          : "単語を編集"
+        : isToday
+          ? "今日の学習"
+          : band === MY_BAND
+            ? "マイ単語帳"
+            : `TOEIC ${band}点`;
   function go(next: Screen) {
     void Speech.stop();
     setScreen(next);
   }
   function back() {
-    go(screen === "mode" || isToday ? "home" : "mode");
+    if (screen === "wordForm") go(formFrom);
+    else go(screen === "mode" || isToday ? "home" : "mode");
+  }
+  // ---- 単語の登録・編集 ----
+  /** 登録画面を開く。word を渡すとその単語の編集、渡さなければ newBand に新しく登録 */
+  function openWordForm(word?: Word, newBand = MY_BAND) {
+    setFormFrom(screen);
+    setEditingId(word ? word.No : null);
+    setForm(
+      word
+        ? {
+            word: word.word,
+            meaning: word.meaning,
+            example: word.example,
+            example_ja: word.example_ja,
+            score_band: word.score_band,
+          }
+        : emptyForm(newBand),
+    );
+    setFormError("");
+    setFormSaved("");
+    setConfirmDelete(false);
+    go("wordForm");
+  }
+  function saveWordForm() {
+    const problem = validateCustomWord(form, BANDS);
+    if (problem) {
+      setFormError(problem);
+      return;
+    }
+    if (editingId !== null) {
+      editCustomWord(editingId, form);
+      go(formFrom);
+      return;
+    }
+    const added = addCustomWord(form);
+    // 続けて登録しやすいよう、登録先はそのままで入力欄だけ空にする
+    setForm(emptyForm(form.score_band));
+    setFormError("");
+    setFormSaved(`「${added.word}」を${bandName(added.score_band)}に登録しました。続けて登録できます。`);
+    scroll.current?.scrollTo({ y: 0, animated: true });
+  }
+  function deleteWordForm() {
+    if (editingId === null) return;
+    // 1回目は確認を出し、もう一度押したら削除する（Web では確認ダイアログが出せないため）
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    removeCustomWord(editingId);
+    forget(editingId);
+    go(formFrom);
   }
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -305,7 +417,7 @@ function LearningApp() {
     if (!word || revealed) return;
     setRevealed(true);
     if (autoSpeak)
-      speakAll(reverseCards ? [word.word, word.example] : [word.example]);
+      speakAll((reverseCards ? [word.word, word.example] : [word.example]).filter(Boolean));
   }
   function studyTap() {
     if (revealed) advanceCard();
@@ -494,7 +606,7 @@ function LearningApp() {
               </Text>,
             )
           : englishWord}
-        {reverse && !showMeaning && (
+        {reverse && !showMeaning && !!w.example && (
           <View style={[s.meaning, { borderTopColor: c.line }]}>
             {text("例文（空欄に入る英単語は？）", 14, c.accent)}
             {tappable(text(clozeExample(w.word, w.example), 17, c.ink))}
@@ -505,13 +617,17 @@ function LearningApp() {
             {reverse
               ? englishWord
               : tappable(<Text style={[s.meaningText, { color: c.ink }]}>{w.meaning}</Text>)}
-            <View style={{ gap: 8 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                {tappable(text(w.example, 17, c.ink))}
-                {audioButton(w.example, "英語の例文を聞く")}
+            {(!!w.example || !!w.example_ja) && (
+              <View style={{ gap: 8 }}>
+                {!!w.example && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    {tappable(text(w.example, 17, c.ink))}
+                    {audioButton(w.example, "英語の例文を聞く")}
+                  </View>
+                )}
+                {!!w.example_ja && tappable(text(w.example_ja, 16, c.muted))}
               </View>
-              {tappable(text(w.example_ja, 16, c.muted))}
-            </View>
+            )}
           </View>
         )}
         {studying && (
@@ -529,9 +645,18 @@ function LearningApp() {
     );
     return (
       <View style={[s.card, { backgroundColor: c.card, borderColor: c.line }]}>
-        {studying && isWeak(progress, w.No) && (
-          <View style={[s.weakBadge, { borderColor: c.wrongBorder }]}>
-            <Text style={[s.weakBadgeText, { color: c.wrong }]}>苦手な単語</Text>
+        {studying && (isWeak(progress, w.No) || isCustomWord(w)) && (
+          <View style={s.badges}>
+            {isWeak(progress, w.No) && (
+              <View style={[s.weakBadge, { borderColor: c.wrongBorder }]}>
+                <Text style={[s.weakBadgeText, { color: c.wrong }]}>苦手な単語</Text>
+              </View>
+            )}
+            {isCustomWord(w) && (
+              <View style={[s.weakBadge, { borderColor: c.border }]}>
+                <Text style={[s.weakBadgeText, { color: c.muted }]}>自分で登録</Text>
+              </View>
+            )}
           </View>
         )}
         {cardContent}
@@ -574,6 +699,154 @@ function LearningApp() {
     );
   }
   /** ホームの「今日の学習」。目標スコアに合わせて、その日に学習する単語をおまかせで選ぶ */
+  /** ホームの「マイ単語帳」 */
+  function myWordbookCard() {
+    const n = words.filter((w) => w.score_band === MY_BAND).length;
+    const m = masteredByBand.get(MY_BAND) ?? 0;
+    const weakCount = weakByBand.get(MY_BAND) ?? 0;
+    return (
+      <View style={[s.level, { backgroundColor: c.card, borderColor: c.border }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`マイ単語帳、${n}語中${m}語習得`}
+          onPress={() => {
+            setBand(MY_BAND);
+            go("mode");
+          }}
+          style={({ pressed }) => ({ gap: 10, opacity: pressed ? 0.7 : 1 })}
+        >
+          <View style={s.row}>
+            <Text style={[s.levelNumber, { color: c.ink, fontSize: 24 }]}>マイ単語帳</Text>
+            {text("→", 24, c.accent)}
+          </View>
+          {text(n > 0 ? "自分で登録した単語を覚える。" : "覚えたい単語を、自分で登録できます。", 16, c.muted)}
+          {n > 0 && meter(m, n)}
+          {n > 0 && (
+            <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
+              {text(`${m} / ${n} 語を習得`, 14, c.muted)}
+              {weakCount > 0 && text(`苦手 ${weakCount}語`, 14, c.wrong)}
+            </View>
+          )}
+        </Pressable>
+        {button("＋ 単語を登録する", () => openWordForm(), true, !customReady)}
+      </View>
+    );
+  }
+  /** 学習メニューの下に出す、登録した単語の一覧（マイ単語帳では全て、レベルではそのレベルの分） */
+  function registeredWordsCard() {
+    const list = customWords.filter((w) => band === MY_BAND || w.score_band === band).reverse();
+    const description =
+      band === MY_BAND
+        ? list.length > 0
+          ? `全部で${list.length}語。タップすると編集できます。各レベルに入れた単語もここに出ます。`
+          : "英単語と意味を入れるだけで登録できます。"
+        : list.length > 0
+          ? `${list.length}語。タップすると編集できます。`
+          : "このレベルに、自分で単語を足せます。";
+    return (
+      <View style={[s.card, { backgroundColor: c.card, borderColor: c.line }]}>
+        {text(band === MY_BAND ? "登録した単語" : "このレベルに登録した単語", 24)}
+        {text(description, 16, c.muted)}
+        {list.length > 0 && (
+          <View>
+            {list.map((w) => (
+              <Pressable
+                key={w.No}
+                accessibilityRole="button"
+                accessibilityLabel={`${w.word}、${w.meaning}。編集する`}
+                onPress={() => openWordForm(w)}
+                style={({ pressed }) => [
+                  s.row,
+                  s.wordRow,
+                  { borderTopColor: c.line, opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <View style={{ flexShrink: 1, gap: 2 }}>
+                  <Text style={[s.wordRowWord, { color: c.ink }]}>{w.word}</Text>
+                  {text(w.meaning, 15, c.muted)}
+                </View>
+                {band === MY_BAND && text(bandName(w.score_band), 13, c.accent)}
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {button(
+          band === MY_BAND ? "＋ 単語を登録する" : "＋ このレベルに単語を登録する",
+          () => openWordForm(undefined, band),
+          band !== MY_BAND,
+          !customReady,
+        )}
+      </View>
+    );
+  }
+  /** 登録画面の入力欄 */
+  function formField(
+    label: string,
+    key: "word" | "meaning" | "example" | "example_ja",
+    props: TextInputProps,
+  ) {
+    return (
+      <View style={{ gap: 6 }}>
+        {text(label, 15, c.ink)}
+        <TextInput
+          value={form[key]}
+          onChangeText={(value) => {
+            setForm((f) => ({ ...f, [key]: value }));
+            setFormError("");
+            setFormSaved("");
+            setConfirmDelete(false);
+          }}
+          accessibilityLabel={label}
+          placeholderTextColor={c.muted}
+          style={[
+            s.input,
+            props.multiline && s.inputMultiline,
+            { color: c.ink, borderColor: c.border, backgroundColor: c.bg },
+          ]}
+          {...props}
+        />
+      </View>
+    );
+  }
+  /** 登録先（マイ単語帳・各レベル）を選ぶボタン */
+  function bandChips() {
+    const chip = (b: number) => {
+      const on = form.score_band === b;
+      return (
+        <Pressable
+          key={b}
+          accessibilityRole="button"
+          accessibilityState={{ selected: on }}
+          accessibilityLabel={`登録先 ${bandName(b)}`}
+          onPress={() => setForm((f) => ({ ...f, score_band: b }))}
+          style={({ pressed }) => [
+            s.chip,
+            b === MY_BAND && { flexBasis: "auto", flexGrow: 0 },
+            {
+              borderColor: on ? c.accent : c.border,
+              backgroundColor: on ? c.accent : c.card,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              s.chipText,
+              { color: on ? (dark ? "#102A28" : "#FFFFFF") : c.ink, fontWeight: on ? "700" : "500" },
+            ]}
+          >
+            {b === MY_BAND ? "マイ単語帳" : b}
+          </Text>
+        </Pressable>
+      );
+    };
+    return (
+      <View style={{ gap: 6 }}>
+        {chip(MY_BAND)}
+        <View style={s.chips}>{BANDS.map(chip)}</View>
+      </View>
+    );
+  }
   function todayCard() {
     if (!target || editingTarget)
       return (
@@ -733,6 +1006,8 @@ function LearningApp() {
       </View>
       <ScrollView
         ref={scroll}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={[
           s.content,
           screen === "study" && word && { flexGrow: 1, paddingBottom: 0 },
@@ -773,13 +1048,14 @@ function LearningApp() {
                   <View style={s.row}>
                     {text("覚えた単語", 16, c.ink)}
                     <Text style={[s.stat, { color: c.accent }]}>
-                      {progress.mastered.length}
-                      <Text style={{ fontSize: 16 }}> / 1,500</Text>
+                      {formatCount(masteredTotal)}
+                      <Text style={{ fontSize: 16 }}> / {formatCount(words.length)}</Text>
                     </Text>
                   </View>
-                  {meter(progress.mastered.length, 1500)}
+                  {meter(masteredTotal, words.length)}
                 </View>
                 {todayCard()}
+                {myWordbookCard()}
                 {bands.map((b, i) => {
                   const n = words.filter((w) => w.score_band === b).length;
                   const m = masteredByBand.get(b) ?? 0;
@@ -830,9 +1106,13 @@ function LearningApp() {
               <>
                 {heading(
                   "学習メニュー",
-                  `${band}点への、一歩。`,
-                  `${total}語のうち、${mastered}語を習得済み。${weak > 0 ? `苦手な単語は${weak}語。` : ""}`,
+                  band === MY_BAND ? "自分だけの、単語帳。" : `${band}点への、一歩。`,
+                  total === 0
+                    ? "まだ単語がありません。覚えたい単語を登録しましょう。"
+                    : `${total}語のうち、${mastered}語を習得済み。${weak > 0 ? `苦手な単語は${weak}語。` : ""}`,
                 )}
+                {total > 0 && (
+                <>
                 <View
                   style={[
                     s.card,
@@ -900,12 +1180,66 @@ function LearningApp() {
                 >
                   {text("確かめる", 24)}
                   {text(
-                    "4択・10問。苦手な単語を優先して出題します。",
+                    `4択・${Math.min(10, total)}問。苦手な単語を優先して出題します。`,
                     16,
                     c.muted,
                   )}
                   {button("4択クイズを始める →", startQuiz)}
                   {text("間違えた単語は「まだ」に戻ります。", 14, c.muted)}
+                </View>
+                </>
+                )}
+                {registeredWordsCard()}
+              </>
+            )}
+            {screen === "wordForm" && (
+              <>
+                {heading(
+                  "",
+                  editingId === null ? "単語を登録" : "単語を編集",
+                  "英単語と意味は必ず入れてください。例文はなくても登録できます。",
+                  true,
+                )}
+                {!!formSaved && (
+                  <View style={[s.notice, { backgroundColor: c.soft, marginBottom: 0 }]}>
+                    {text(formSaved, 15, c.ink)}
+                  </View>
+                )}
+                {!!customError && text(customError, 15, c.wrong)}
+                <View style={[s.card, { backgroundColor: c.card, borderColor: c.line }]}>
+                  {formField("英単語", "word", {
+                    placeholder: "例：deadline",
+                    autoCapitalize: "none",
+                    autoCorrect: false,
+                    maxLength: LIMITS.word,
+                  })}
+                  {!!duplicate &&
+                    text(
+                      `「${duplicate.word}」は${bandName(duplicate.score_band)}に${isCustomWord(duplicate) ? "登録済み" : "収録されています"}。このまま登録することもできます。`,
+                      14,
+                      c.wrong,
+                    )}
+                  {formField("意味", "meaning", { placeholder: "例：締め切り", maxLength: LIMITS.meaning })}
+                  {formField("例文（なくても可）", "example", {
+                    placeholder: "例：The deadline is this Friday.",
+                    autoCapitalize: "sentences",
+                    multiline: true,
+                    maxLength: LIMITS.example,
+                  })}
+                  {formField("例文の訳（なくても可）", "example_ja", {
+                    placeholder: "例：締め切りは今週の金曜日です。",
+                    multiline: true,
+                    maxLength: LIMITS.example_ja,
+                  })}
+                  <View style={{ gap: 8 }}>
+                    {text("登録先", 15, c.ink)}
+                    {bandChips()}
+                  </View>
+                  {!!formError && text(formError, 15, c.wrong)}
+                  {button(editingId === null ? "登録する" : "保存する", saveWordForm, false, !customReady)}
+                  {editingId !== null &&
+                    button(confirmDelete ? "本当に削除する" : "この単語を削除する", deleteWordForm, true)}
+                  {confirmDelete && text("削除すると、この単語の学習記録も消えます。", 14, c.wrong)}
                 </View>
               </>
             )}
@@ -975,7 +1309,7 @@ function LearningApp() {
                 {button(isToday ? "もう少し学習する" : "もう一度学習する", () => startStudy(studyMode))}
                 {isToday
                   ? button("ホームに戻る", () => go("home"), true)
-                  : button("レベルのメニューに戻る", () => go("mode"), true)}
+                  : button(band === MY_BAND ? "マイ単語帳のメニューに戻る" : "レベルのメニューに戻る", () => go("mode"), true)}
               </>
             )}
             {screen === "quiz" &&
@@ -1160,13 +1494,24 @@ const s = StyleSheet.create({
   },
   chipText: { fontSize: 17, lineHeight: 22 },
   todayCount: { fontSize: 26, fontWeight: "700" },
+  badges: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: -8 },
+  wordRow: { borderTopWidth: 1, paddingVertical: 12, gap: 12 },
+  wordRowWord: { fontSize: 18, lineHeight: 26, fontWeight: "700" },
+  input: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 17,
+    minHeight: 50,
+  },
+  inputMultiline: { minHeight: 84, textAlignVertical: "top" },
   weakBadge: {
     alignSelf: "flex-start",
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 2,
-    marginBottom: -8,
   },
   weakBadgeText: { fontSize: 14, lineHeight: 20, fontWeight: "600" },
   // userSelect: Web でカードをマウスでドラッグしたとき、文字が選択されないようにする
