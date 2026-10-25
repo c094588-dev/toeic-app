@@ -36,7 +36,7 @@ export function useCustomWords(bands: readonly number[]) {
         setReady(true);
       })
       .catch(() => setError("登録した単語を読み込めませんでした。"));
-  }, []);
+  }, [bands]);
   function update(next: CustomWordStore) {
     current.current = next;
     setStore(next);

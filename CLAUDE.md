@@ -13,6 +13,7 @@
 
 ## プロジェクト
 - アプリ本体は `mobile/`（React Native + Expo）。単語データは直下の `words.json`（1,500語）。
-- 確認コマンド（`mobile/` で実行）: `npm test`、`npm run typecheck`、`npx expo export --platform web`
+- 確認コマンド（`mobile/` で実行）: `npm run check`（型チェック＋単体テスト）、`npm run build:web && npm run e2e`（Web 版の E2E。Chromium は `E2E_CHROMIUM=/opt/pw-browsers/chromium` で指定できる）、`npm run shots -- <出力先>`（スクリーンショット）
+- 設計の背景と残作業は `docs/`（特に `docs/NEXT_ACTIONS.md`、`docs/QA_REPORT.md`）を先に読む。
 - 本番: https://toeic-app.trainer-jonny.workers.dev （Cloudflare Workers Builds、本番ブランチは `main`）
 - 詳しくは [README.md](README.md)、[mobile/README.md](mobile/README.md)、[mobile/CLOUDFLARE.md](mobile/CLOUDFLARE.md)。

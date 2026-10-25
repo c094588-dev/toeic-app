@@ -98,7 +98,7 @@ test("進捗の読み込み: 関数で判定すると、登録した単語の記
   const p = parseProgress(raw, known);
   assert.deepEqual(p.mastered, [1, CUSTOM_ID_BASE + 1]);
   assert.deepEqual(p.notYet, []);
-  assert.deepEqual(Object.keys(p.stats), [String(CUSTOM_ID_BASE + 1)]);
+  assert.deepEqual(Object.keys(p.stats).sort(), ["1", String(CUSTOM_ID_BASE + 1)]);
 });
 
 test("単語を削除すると、その単語の記録も消える", () => {

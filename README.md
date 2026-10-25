@@ -12,6 +12,8 @@ TOEIC 500〜900点レベルの英単語1,500語を、フラッシュカードと
 | `words.json` | 単語データ（1,500語、例文と日本語訳つき）。アプリが直接読み込む |
 | `appstore/` | App Store に載せる説明文・キーワード・スクリーンショット。内容は [appstore/README.md](appstore/README.md) |
 | `package.json` / `wrangler.jsonc` | Cloudflare でリポジトリ直下からビルド・公開するための入口。設定は [mobile/CLOUDFLARE.md](mobile/CLOUDFLARE.md) |
+| `docs/` | 競合分析・プロダクト戦略・UX 再設計・学習設計・収益化計画・グロース戦略・実装報告・QA 報告・次にやること |
+| `.github/workflows/` | push と PR で型チェック・単体テスト・Web ビルド・E2E を回す GitHub Actions |
 
 `main` ブランチを更新すると、Cloudflare Workers Builds で本番へ自動公開されます。
 

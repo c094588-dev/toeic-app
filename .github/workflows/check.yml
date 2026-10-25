@@ -1,0 +1,26 @@
+# push / PR のたびに、型チェック・単体テスト・Web ビルド・E2E を回す
+name: check
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build:web
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e

@@ -10,9 +10,14 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "build:web": "expo export --platform web"
+    "build:web": "expo export --platform web",
+    "e2e": "node e2e/app.e2e.mjs",
+    "shots": "node e2e/shots.mjs",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "lint": "eslint ."
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.25",
     "expo-audio": "~57.0.5",
@@ -20,6 +25,7 @@
     "expo-speech": "~57.0.3",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
+    "expo-store-review": "~57.0.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -28,6 +34,9 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
+    "playwright": "1.63.0",
     "typescript": "~6.0.3"
   }
 }
