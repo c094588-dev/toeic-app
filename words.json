@@ -938,11 +938,11 @@
   {
     "No": 106,
     "word": "patient",
-    "meaning": "忍耐強い",
-    "example": "Please be patient while we process your request.",
+    "meaning": "患者、忍耐強い",
+    "example": "The doctor asked the patient to be patient.",
     "score_band": 500,
     "importance": "必須",
-    "example_ja": "ご依頼を処理する間、しばらくお待ちください。"
+    "example_ja": "医師は患者に、しばらく辛抱するよう頼みました。"
   },
   {
     "No": 107,
@@ -1739,7 +1739,7 @@
   {
     "No": 197,
     "word": "congratulate",
-    "meaning": "祝う",
+    "meaning": "（人に）お祝いを言う",
     "example": "I want to congratulate you on your promotion.",
     "score_band": 500,
     "importance": "必須",
@@ -1901,7 +1901,7 @@
   {
     "No": 215,
     "word": "courier",
-    "meaning": "宅急便、運び屋",
+    "meaning": "宅配便、配達員",
     "example": "The package was sent by courier.",
     "score_band": 500,
     "importance": "必須",
@@ -2820,10 +2820,10 @@
     "No": 328,
     "word": "figure",
     "meaning": "数字、人物、姿、〜と思う",
-    "example": "I can't figure out how this works.",
+    "example": "Sales figures for March were higher than expected.",
     "score_band": 500,
     "importance": "必須",
-    "example_ja": "これの仕組みが理解できません。"
+    "example_ja": "3月の売上の数字は予想より高かったです。"
   },
   {
     "No": 329,
@@ -3773,7 +3773,7 @@
   {
     "No": 442,
     "word": "jump",
-    "meaning": "跳ぶ、ジャンプ、跳ぶ",
+    "meaning": "跳ぶ、急上昇する",
     "example": "He can jump very high.",
     "score_band": 500,
     "importance": "必須",
@@ -5420,7 +5420,7 @@
   {
     "No": 2126,
     "word": "criteria",
-    "meaning": "基準（criterion の複数形）",
+    "meaning": "基準、判断のよりどころ",
     "example": "The judges explained the criteria for the award.",
     "score_band": 600,
     "importance": "必須",
