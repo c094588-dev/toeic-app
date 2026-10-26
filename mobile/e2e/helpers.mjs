@@ -44,8 +44,9 @@ export async function launch() {
 /**
  * 新しいページを開く。読み上げは記録するだけで音は出さない。
  * `storage` に localStorage の初期値を渡せる（既存ユーザーの保存データの再現など）。
+ * `time` を渡すと、その日時から時計を進める（日付をまたぐ確認に使う。`ctx.clock` で日時を変えられる）。
  */
-export async function openPage(browser, url, { size = SIZES.std, scheme = "light", storage = {}, touch = false } = {}) {
+export async function openPage(browser, url, { size = SIZES.std, scheme = "light", storage = {}, touch = false, time } = {}) {
   const ctx = await browser.newContext({
     viewport: size,
     colorScheme: scheme,
@@ -61,6 +62,7 @@ export async function openPage(browser, url, { size = SIZES.std, scheme = "light
     }
     for (const [k, v] of Object.entries(storage)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
   }, storage);
+  if (time) await ctx.clock.install({ time });
   const page = await ctx.newPage();
   // 見つからない要素は早めに諦める（失敗の原因がすぐ分かるように）
   page.setDefaultTimeout(8000);

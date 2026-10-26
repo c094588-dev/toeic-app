@@ -28,7 +28,7 @@ import {
 } from "./src/learning";
 import { MY_BAND, findDuplicate, isCustomId, isCustomWord, validateCustomWord, type CustomWordInput } from "./src/customWords";
 import type { StudySession } from "./src/session";
-import { lastSevenDays, daysSinceLastStudy } from "./src/days";
+import { lastSevenDays, daysSinceLastStudy, goalFor } from "./src/days";
 import { runListen } from "./src/listen";
 import { PREMIUM_ENABLED } from "./src/premium";
 import { speakEnglish, stopSpeech, speakAsync, sleep } from "./src/speech";
@@ -37,6 +37,7 @@ import { useCustomWords } from "./src/useCustomWords";
 import { useSession } from "./src/useSession";
 import { useSettings } from "./src/useSettings";
 import { useDays } from "./src/useDays";
+import { useToday } from "./src/useToday";
 import { useReview } from "./src/useReview";
 import { useReduceMotion } from "./src/useReduceMotion";
 import { fontScale, type, useTheme } from "./src/theme";
@@ -121,6 +122,8 @@ function Root() {
   const wordsById = useMemo(() => new Map(words.map((w) => [w.No, w])), [words]);
   const sessionStore = useSession(wordsById, progressReady && customReady);
   const days = useDays();
+  // 今日の日付。開いたまま日付が変わったら、今日の学習語数・予定・目標を新しい日で組み直す
+  const today = useToday();
   const review = useReview();
 
   // ---- 集計 ----
@@ -142,30 +145,37 @@ function Root() {
   }, [words]);
   const masteredTotal = [...masteredByBand.values()].reduce((sum, n) => sum + n, 0);
   const target = settings.target;
-  const doneToday = useMemo(() => studiedToday(progress), [progress]);
+  // today は中で使わないが、日付が変わったら数え直すために依存に入れる
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const doneToday = useMemo(() => studiedToday(progress), [progress, today]);
   const sinceLast = daysSinceLastStudy(days.log);
   // しばらくぶり: 新しい単語は出さず、覚えた単語のおさらいから
   const catchUp = doneToday === 0 && sinceLast !== null && sinceLast >= CATCH_UP_AFTER_DAYS;
   // 今日の残り分（復習と、1日の上限までの新しい単語）
   const basePlan = useMemo(
     () => (target ? todayPlan(words, progress, target, Math.max(5, DAILY_GOAL - doneToday), Date.now(), Math.random, { catchUp }) : null),
-    [target, progress, doneToday, words, catchUp],
+    // today は中で使わないが、日付が変わったら組み直すために依存に入れる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [target, progress, doneToday, words, catchUp, today],
   );
   // 今日の目標は20語。出せる単語がそれより少ない日（始めたばかり・復習が少ない日）は、出せる分までを目標にする。
   // その日に初めて組んだ語数で固定する（答えを見ずに「覚えた」にした語は新しい単語の枠を使わないため、固定しないと目標が途中で増えて見える）
   const available = basePlan?.words.length ?? 0;
-  const goalToday = days.goalToday ?? Math.max(1, Math.min(DAILY_GOAL, doneToday + available));
+  // 目標は today の日付で取り出す（上の語数・予定と同じ日付で比べ、別の日の値を混ぜない）
+  const storedGoal = goalFor(days.goal, today);
+  const goalToday = storedGoal ?? Math.max(1, Math.min(DAILY_GOAL, doneToday + available));
   // 目標に届いたか、出せる語が尽きたら達成
   const reached = doneToday > 0 && (doneToday >= goalToday || available === 0);
   const allReady = progressReady && customReady && days.ready;
-  const { goalToday: storedGoal, setGoalToday } = days;
+  const { setGoalToday } = days;
   useEffect(() => {
-    if (allReady && target && basePlan && storedGoal === null && doneToday + available > 0) setGoalToday(goalToday);
-  }, [allReady, target, basePlan, storedGoal, setGoalToday, doneToday, available, goalToday]);
+    if (allReady && target && basePlan && storedGoal === null && doneToday + available > 0) setGoalToday(goalToday, today);
+  }, [allReady, target, basePlan, storedGoal, setGoalToday, doneToday, available, goalToday, today]);
   // 目標達成後の「さらに10語」は、新しい単語の上限を超えてよい
   const morePlan = useMemo(
     () => (target && reached ? todayPlan(words, progress, target, 10, Date.now(), Math.random, { more: true }) : null),
-    [target, progress, words, reached],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [target, progress, words, reached, today],
   );
   const plan = reached ? morePlan : basePlan;
   const weakAcross = useMemo(() => (target ? weakWordsAcross(words, progress, target).length : 0), [words, progress, target]);

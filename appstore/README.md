@@ -141,34 +141,35 @@ TOEIC は ETS の登録商標です。このアプリは ETS の承認・推奨�
 - **連絡先**: 氏名・電話番号・メールアドレスを入力します
 - **メモ**（審査担当者向け。英語で書いておくと確実です）:
 
-2026-10-21 に、Apple から「ガイドライン 2.1（追加の情報が必要）」として、次の6つを求められました。返信と同じ内容をメモにも入れるよう言われたので、メモは次の文面にしています。
+1.1.0 のメモです（2026-10-26 に App Store Connect に入れました）。1.0 の審査で、2026-10-21 に「ガイドライン 2.1（追加の情報が必要）」として、画面収録・目的と対象・使い方・外部サービス・地域差・規制と第三者の素材の6つを求められました。返信と同じ内容をメモにも入れるよう言われたので、その形を引き継ぎ、1.1.0 で増えた操作（取り消し、続きから、今日はここまで、耳だけ復習、マイ単語帳、設定）を足しています。
 
-1. 実機（最新の iOS）での画面収録。アプリの起動から始めて、ふだんの使い方を見せる
-2. アプリの目的と対象ユーザー
-3. 主な機能の使い方
-4. 使っている外部のサービス
-5. 地域による違い
-6. 規制のある業種か、第三者の素材を使っているか
-
-画面収録は、iPhone 17（TestFlight で入れたビルド2）で撮り、返信に添付しました。
+- マイ単語帳に登録した単語は端末の中だけにあり、ほかの人には見えないことを書いています（利用者の投稿機能と誤解されないため）。
+- 画面をロックしても読み上げが続くのは耳だけ復習のためだけ、と書いています（背景オーディオの使い道を Apple が確かめるため）。
+- 画面収録は 1.0 の返信に添付したもの（iPhone 17、TestFlight のビルド2）を指しています。
 
 ```
-1. Screen recording
-A screen recording (attached to our reply in App Review) was captured on a physical iPhone running the latest iOS. It starts with launching the app and shows the typical flow: choosing a target score, starting today's study, tapping a card to show the meaning, swiping right ("覚えた" = learned) and left ("まだ" = not yet), pronunciation, the Japanese-to-English mode, and the 10-question quiz with its results.
-The app has no account registration, login, user-generated content, or paid content or features.
+1. Screen recording and account
+For version 1.0, we attached a screen recording captured on a physical iPhone to our reply in App Review. Version 1.1.0 keeps the same basic flow and adds the features described in section 3.
+The app has no account registration, login, or paid content or features. Users can add their own words (a word and its meaning) to "マイ単語帳" (My words). These words are stored only on the device and are never shared with or shown to other users.
 
 2. Purpose and target audience
-英単語ノート (Eitango Note) is a vocabulary app for Japanese speakers, mainly working adults and students, preparing for the TOEIC Listening & Reading test. Learners often do not know which words to study for their target score, and they have little time. The app builds a daily set of 20 words from the user's target score (500 to 900), gives priority to words the user marked "not yet" or missed in the quiz, and brings learned words back for review later. It includes 1,500 words, each with a Japanese translation and an example sentence with its translation, so users can study in short sessions, such as while commuting.
+英単語ノート (Eitango Note) is a vocabulary app for Japanese speakers, mainly working adults and students, preparing for the TOEIC Listening & Reading test. Learners often do not know which words to study for their target score, and they have little time. The app builds a daily set of up to 20 words from the user's target score (500 to 900): words due for review come first, and new words are limited to 10 per day. Words marked "learned" come back after longer and longer intervals. It includes 1,500 words, each with a Japanese translation and an example sentence with its translation.
 
 3. How to access the main features
 No setup, login, or sample files are required. All features are available right after launch.
-- Home screen: tap the target score to change it, then tap "今日の学習を始める" (Start today's study).
+- First launch: choose a target score (for example, 600).
+- Home: tap "今日の学習を始める" (Start today's study).
 - Study card: tap anywhere to show the meaning. Swipe right for "覚えた" (learned) or left for "まだ" (not yet). The same two buttons are at the bottom of the screen.
-- Tap "🔊" to hear the word. The "自動発音" button turns automatic pronunciation on or off.
-- Home screen: tap a level (500 to 900) to open its menu. There you can study flashcards in English to Japanese or Japanese to English ("英語 → 日本語" / "日本語 → 英語"), or tap "4択クイズを始める" to take a 10-question multiple-choice quiz.
+- Undo (new in 1.1.0): after each judgment, "取り消す" (Undo) appears for 4 seconds.
+- Resume (new in 1.1.0): tap "戻る" (Back) in the middle of a session. Home then shows "続きから" (Resume), which continues from the same card on the same day.
+- Result (new in 1.1.0): after the last card, the "今日はここまで" (That's all for today) screen shows the result and tomorrow's plan.
+- Listening review (new in 1.1.0): on Home, tap "耳だけ復習" (Listening review). The app reads the word, its meaning, and the example sentence aloud. Use "一時停止" (Pause), "再開" (Resume), "次へ" (Next), and "終わる" (Stop).
+- My words (new in 1.1.0): on Home, tap "マイ単語帳" (My words), then "単語を登録する" (Add a word).
+- Levels and quiz: on Home, tap a level (500点 to 900点) under "レベル別に学ぶ" (Study by level). There you can study flashcards or take a 10-question multiple-choice quiz ("4択クイズ").
+- Settings: tap the gear icon ("設定", Settings) at the top of Home to change the target score, turn automatic pronunciation on or off, or switch to Japanese-to-English cards ("日本語 → 英語で出題").
 
 4. External services
-None. The app makes no network requests. Learning progress and settings are stored only on the device (AsyncStorage). Pronunciation uses the iOS built-in text-to-speech (AVSpeechSynthesizer). The app uses no data providers, authentication services, payment processors, analytics, advertising, or AI services.
+None. The app makes no network requests. Learning progress, the user's own words, and settings are stored only on the device (AsyncStorage). Pronunciation uses the iOS built-in text-to-speech (AVSpeechSynthesizer). The app declares the audio background mode only so that Listening review can keep reading aloud when the screen is locked. The app uses no data providers, authentication services, payment processors, analytics, advertising, or AI services.
 
 5. Regional differences
 There are none. The app works the same in every region where it is available. The user interface is in Japanese.
@@ -179,18 +180,16 @@ The app is not in a regulated industry. All word lists, example sentences, and t
 
 ## スクリーンショット（iPhone 6.3インチ、1206×2622）
 
-1.1 で画面が変わったので、公開前に撮り直します（`cd mobile && npm run build:web && npm run shots -- ../appstore/raw` で素材を出し、見出しと枠を付ける）。見出し案: 1「目標スコアを選ぶだけで 今日の20語が決まる」、2「途中でやめても 続きから」、3「右へスワイプで「覚えた」 左へ「まだ」。4秒以内なら取り消せる」、4「答えを開くと 例文も自動で読み上げ」、5「耳だけ復習 単語 → 意味 → 例文」、6「今日はここまで 明日の予定もわかる」。
-
 `screenshots/` の6枚を、App Store Connect の「Dynamic Island搭載iPhone（中型ディスプレイ）」の欄に、番号の順にアップロードします（この欄が受け付けるのは 1206×2622 などの6.1・6.3インチのサイズで、1320×2868 の6.9インチは受け付けません）。ほかの画面サイズでは、この画像が自動で使われます。iPad には対応していないので、iPad 用の画像は不要です。
 
 | 番号 | 見出し | 画面 |
 | --- | --- | --- |
-| 1 | 目標スコアを選ぶだけで 今日の20語が決まる | ホーム（今日の学習） |
-| 2 | 画面のどこをタップしても 答えが出る | 単語カード |
-| 3 | 右へスワイプで「覚えた」 左へスワイプで「まだ」 | スワイプ中のカード |
+| 1 | 目標スコアを選ぶだけで 今日の20語が決まる（帯: 登録不要・広告なし） | ホーム（2日目。復習10語・新しい単語10語） |
+| 2 | 途中でやめても 続きから | 「続きから（3 / 20）」のホーム |
+| 3 | 右へスワイプで「覚えた」 左へ「まだ」（4秒以内なら取り消せる） | 右へスワイプしている途中と「取り消す」 |
 | 4 | 答えを開くと 例文も自動で読み上げ | 意味と例文 |
-| 5 | 4択クイズで 覚えたかチェック | クイズ |
-| 6 | 苦手な単語は 優先して出題 | ダークモードのカード |
+| 5 | 耳だけ復習 単語 → 意味 → 例文 | 耳だけ復習 |
+| 6 | 今日はここまで 明日の予定もわかる | 結果の画面（明日の予定つき） |
 
 ![1](screenshots/1.png)
 ![2](screenshots/2.png)
@@ -199,7 +198,20 @@ The app is not in a regulated industry. All word lists, example sentences, and t
 ![5](screenshots/5.png)
 ![6](screenshots/6.png)
 
-画像は Web 版の画面に、見出しと iPhone の枠を付けて作っています。そのため絵文字（🔊）の絵柄だけは、実機の iPhone と少し違います。
+### 作り方（1.1.0 から）
+
+`mobile/e2e/storeshots.mjs` で、Web 版の画面を撮り、見出しと iPhone の枠を付けます。見出しはこのファイルの `SLIDES` にあります。
+
+```
+cd mobile
+npm run build:web
+node e2e/storeshots.mjs ../appstore/screenshots
+```
+
+- 1日目に今日の10語を学習してから、時計を翌朝に進めて撮ります。初日は新しい単語だけの10語なので、1枚目の見出し「20語」と画面の数字を合わせるためです。
+- 単語は毎回ランダムに選ばれるので、撮り直すと画面の単語が変わります。
+- 手元に Playwright 用のブラウザがない Mac では、`E2E_CHROMIUM="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` を付けると Chrome で撮れます。
+- 画像は Web 版の画面なので、文字の形やアイコンは実機の iPhone と少し違います。
 
 ## ダウンロード数のレポート
 

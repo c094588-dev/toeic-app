@@ -1,7 +1,7 @@
 // 日ごとの学習記録のテスト
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bumpDay, dayKey, daysSinceLastStudy, lastSevenDays, parseDailyGoal, parseDayLog } from "../src/days.ts";
+import { bumpDay, dayKey, daysSinceLastStudy, goalFor, lastSevenDays, parseDailyGoal, parseDayLog } from "../src/days.ts";
 const noon = new Date("2026-10-25T12:00:00").getTime();
 
 test("日付のキーはローカル日付", () => {
@@ -37,4 +37,11 @@ test("その日の目標: 今日の分だけ読み、別の日・壊れた値は
   assert.equal(parseDailyGoal(JSON.stringify({ day: dayKey(now), goal: 0 }), now), null);
   assert.equal(parseDailyGoal("{broken", now), null);
   assert.equal(parseDailyGoal(null, now), null);
+});
+
+test("目標語数は、その日のものだけを使う（開いたまま日付が変わっても前の日の目標を引き継がない）", () => {
+  const goal = { day: "2026-10-26", goal: 10 };
+  assert.equal(goalFor(goal, "2026-10-26"), 10);
+  assert.equal(goalFor(goal, "2026-10-27"), null, "日付が変わったら、まだ決めていない扱い");
+  assert.equal(goalFor(null, "2026-10-27"), null);
 });

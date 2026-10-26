@@ -65,3 +65,8 @@ export function parseDailyGoal(raw: string | null, now = Date.now()): number | n
     return null;
   }
 }
+
+/** 決めてある目標語数のうち、その日のものだけを返す（日付が違えば、まだ決めていない＝ null） */
+export function goalFor(goal: DailyGoal | null, day: string): number | null {
+  return goal && goal.day === day ? goal.goal : null;
+}
