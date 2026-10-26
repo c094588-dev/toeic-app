@@ -24,9 +24,9 @@
    eas build --platform ios --profile production
    eas submit --platform ios --latest
    ```
-3. App Store Connect で 1.1.0 を作り、[appstore/README.md](../appstore/README.md) の「このバージョンの新機能（1.1.0）」「説明」「プロモーション用テキスト」「キーワード」を貼る。
-4. スクリーンショットを撮り直す（6 枚、1206×2622）。素材は `cd mobile && npm run build:web && npm run shots -- ../appstore/raw`。
-5. 審査メモは 1.0 のものを流用し、「続きから」「耳だけ復習」「取り消し」の操作を 1 行ずつ足す。
+3. （2026-10-26 済み）App Store Connect で 1.1.0 を作り、[appstore/README.md](../appstore/README.md) の「このバージョンの新機能（1.1.0）」「説明」「プロモーション用テキスト」「キーワード」を貼る。
+4. （2026-10-26 済み。App Store Connect へのアップロードはオーナー）スクリーンショットを撮り直す（6 枚、1206×2622）。作り方は [appstore/README.md](../appstore/README.md) の「作り方」（`node e2e/storeshots.mjs ../appstore/screenshots`）。
+5. （2026-10-26 済み）審査メモは 1.0 のものを流用し、「続きから」「耳だけ復習」「取り消し」の操作を 1 行ずつ足す。
 
 ## 3. 続けて価値が出る開発（優先順）
 
