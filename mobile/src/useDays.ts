@@ -33,14 +33,17 @@ export function useDays() {
     setLog(next);
     if (loaded.current) AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
   }, []);
-  /** その日に初めて今日の学習を組んだときに呼ぶ。null で取り消す（目標スコアを変えたとき） */
-  const setGoalToday = useCallback((n: number | null) => {
+  /**
+   * その日に初めて今日の学習を組んだときに呼ぶ。null で取り消す（目標スコアを変えたとき）。
+   * day には、語数を数えたときの日付を渡す（数えたあとに日付が変わっても、別の日の目標として保存しないため）
+   */
+  const setGoalToday = useCallback((n: number | null, day: string = dayKey()) => {
     if (n === null) {
       setGoal(null);
       AsyncStorage.removeItem(GOAL_KEY).catch(() => {});
       return;
     }
-    const next = { day: dayKey(), goal: n };
+    const next = { day, goal: n };
     setGoal(next);
     AsyncStorage.setItem(GOAL_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
@@ -55,12 +58,11 @@ export function useDays() {
     else delete next[key];
     write(next);
   }, [write]);
-  const today = dayKey();
   return {
     log,
     ready,
-    /** 今日の目標語数（まだ決めていなければ null） */
-    goalToday: goal && goal.day === today ? goal.goal : null,
+    /** 決めてある目標語数と、その日付（日付ごとの値は goalFor で取り出す） */
+    goal,
     setGoalToday,
     bump,
     unbump,

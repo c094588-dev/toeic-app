@@ -289,6 +289,39 @@ for (const [name, size] of Object.entries(SIZES)) {
   }
 }
 
+// ---- 開いたまま日付が変わる（夜のあいだ裏に残っていたアプリを、朝に開いたときと同じ） ----
+{
+  const t = await openPage(browser, server.url, { time: new Date("2026-10-26T08:00:00") });
+  const { page } = t;
+  await s.test("開いたまま日付が変わっても、新しい日の目標は新しい日の語数で組む", async () => {
+    await page.getByLabel("目標スコア 600点").click();
+    await page.waitForTimeout(300);
+    await page.getByText(/今日の学習を始める/).click();
+    await page.waitForTimeout(300);
+    // 答えを開いてから「覚えた」にすると、翌日の復習に入る
+    for (let i = 0; i < 30; i++) {
+      if ((await page.getByText("今日はここまで", { exact: true }).filter({ visible: true }).count()) > 0) break;
+      await t.tapCenter(0.55);
+      await page.getByLabel("覚えたとして保存して次へ").click();
+      await page.waitForTimeout(300);
+    }
+    await page.getByText("今日はここまで", { exact: true }).filter({ visible: true }).last().click();
+    await page.waitForTimeout(300);
+    assert.equal(JSON.parse(await t.storage("toeic.goal.v1")).goal, 10, "1日目の目標は10語");
+    // 開いたまま翌朝にして、1分ごとの日付の確認を進める
+    await t.ctx.clock.setSystemTime(new Date("2026-10-27T08:00:00"));
+    await t.ctx.clock.runFor(61_000);
+    await page.waitForTimeout(300);
+    const body = await text(t);
+    assert.match(body, /今日の学習を始める（20語）/, "2日目は復習10語と新しい単語10語");
+    assert.match(body, /0 \/ 20語/, "2日目の目標は20語（前の日の10語を引き継がない）");
+    const goal = JSON.parse(await t.storage("toeic.goal.v1"));
+    assert.deepEqual(goal, { day: "2026-10-27", goal: 20 });
+    assert.deepEqual(t.errors, []);
+  });
+  await t.close();
+}
+
 await browser.close();
 await server.close();
 process.exit(s.report() ? 0 : 1);
