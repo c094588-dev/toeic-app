@@ -13,6 +13,8 @@
   - https://toeic-app.soruy.workers.dev/privacy.html
   - https://toeic-app.soruy.workers.dev/support.html
 
+- PR #25 をマージ（c7bfbec）。続けて 1.1.1 に版上げ（なおやさんの指示）。手順：ビルド → App Store Connect へ送信 → バージョン 1.1.1 を作成して URL・新機能の文を入力 → TestFlight で実機確認 → なおやさんの「提出して」で審査へ
+
 ## 済んでいること
 - EAS の本番ビルド: 1.0.0（ビルド番号 2）。App Store Connect のバージョン 1.0 に設定済み
   - Expo プロジェクト: @soruy/toeic-word-note（ログインは kurokin09）
