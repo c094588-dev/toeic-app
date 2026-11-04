@@ -39,9 +39,9 @@ EU で配信するには、デジタルサービス法にもとづくトレー�
 
 | 項目 | URL |
 | --- | --- |
-| プライバシーポリシー URL | https://toeic-app.trainer-jonny.workers.dev/privacy.html |
-| サポート URL | https://toeic-app.trainer-jonny.workers.dev/support.html |
-| マーケティング URL（任意） | https://toeic-app.trainer-jonny.workers.dev |
+| プライバシーポリシー URL | https://toeic-app.soruy.workers.dev/privacy.html |
+| サポート URL | https://toeic-app.soruy.workers.dev/support.html |
+| マーケティング URL（任意） | https://toeic-app.soruy.workers.dev |
 
 ## App のプライバシー
 

@@ -4,7 +4,7 @@
 
 ## 1. この PR を出すまで（あなた）
 
-1. PR の Cloudflare プレビューで一通り触る: https://claude-busy-gates-pwhg2v-toeic-app.trainer-jonny.workers.dev
+1. PR の Cloudflare プレビューで一通り触る: https://claude-busy-gates-pwhg2v-toeic-app.soruy.workers.dev
    - 初回 → 目標 600 点 → 今日の学習 → 答え → 覚えた → 取り消す → 戻る → 続きから → 最後まで → 今日はここまで
    - 500 点レベル → 4 択クイズ、耳だけ復習（音が出ます）
    - 設定 → 日本語 → 英語 → 学習

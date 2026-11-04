@@ -4,8 +4,8 @@ iOS・Android・Web共通のTOEIC単語アプリです。以前のSwift版とWeb
 
 ## 公開URL
 
-- 本番（`main`）: https://toeic-app.trainer-jonny.workers.dev
-- `main` 以外のブランチは `https://<ブランチ名>-toeic-app.trainer-jonny.workers.dev` にプレビューが作られます（公開設定は [CLOUDFLARE.md](CLOUDFLARE.md)）。
+- 本番（`main`）: https://toeic-app.soruy.workers.dev
+- `main` 以外のブランチは `https://<ブランチ名>-toeic-app.soruy.workers.dev` にプレビューが作られます（公開設定は [CLOUDFLARE.md](CLOUDFLARE.md)）。
 
 ## 起動
 
