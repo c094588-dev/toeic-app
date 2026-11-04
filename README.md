@@ -2,7 +2,7 @@
 
 TOEIC 500〜900点レベルの英単語1,500語を、フラッシュカードと4択クイズで覚えるアプリです。React Native（Expo）で作っており、iOS・Android・Webに対応しています。
 
-- 公開中のWeb版: https://toeic-app.trainer-jonny.workers.dev
+- 公開中のWeb版: https://toeic-app.soruy.workers.dev
 
 ## 構成
 

@@ -5,13 +5,18 @@
 ## いまの目標
 英単語ノート（iOS版）を App Store でリリースする。
 
+## 2026-11-04：アドレス変更の対応（要対応あり）
+- なおやさんが Cloudflare の workers.dev サブドメインを trainer-jonny → soruy に変更。古いアドレスはつながらない（新：https://toeic-app.soruy.workers.dev）
+- 公開中のアプリのプライバシーポリシー・サポートのリンクは古いアドレスのままで開けない。コードは新しいアドレスに直した（このブランチの PR）。直すには新しいビルドの審査・公開が要る
+- 【未】App Store Connect のプライバシーポリシー URL・サポート URL・マーケティング URL の書き換え（下の「入力」欄のアドレスは新しいものに直してあるが、実際の登録はまだ古い）
+
 ## 済んでいること
 - EAS の本番ビルド: 1.0.0（ビルド番号 2）。App Store Connect のバージョン 1.0 に設定済み
   - Expo プロジェクト: @soruy/toeic-word-note（ログインは kurokin09）
 - App Store Connect（Apple ID 6824718074）の入力
   - なおやさんが入力: 名前、サブタイトル、カテゴリ（教育）、年齢制限 4+、概要、キーワード、審査メモ、サポートURL、App Review の連絡先、データの収集なし、スクリーンショット6枚（6.3インチ）
   - 10/20 夜にシオリが入力・保存し、再読み込みで確認済み
-    - プライバシーポリシーURL: https://toeic-app.trainer-jonny.workers.dev/privacy.html
+    - プライバシーポリシーURL: https://toeic-app.soruy.workers.dev/privacy.html
     - プロモーション用テキスト:「レベルに合った単語をサクッと学び、…」
     - 著作権: © 2026 Naoya Kuroki
     - 価格: 基準となる国は日本、¥0（無料）

@@ -6,8 +6,8 @@ import { Card, Chip, Row, Txt } from "../ui";
 import { Frame } from "../components/Frame";
 import { copy } from "../copy";
 
-export const PRIVACY_URL = "https://toeic-app.trainer-jonny.workers.dev/privacy.html";
-export const SUPPORT_URL = "https://toeic-app.trainer-jonny.workers.dev/support.html";
+export const PRIVACY_URL = "https://toeic-app.soruy.workers.dev/privacy.html";
+export const SUPPORT_URL = "https://toeic-app.soruy.workers.dev/support.html";
 
 export type SettingsProps = {
   theme: Theme;
